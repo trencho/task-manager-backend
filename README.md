@@ -82,12 +82,12 @@ export MONGODB_URI="mongodb://localhost:27017/task-manager"
 ./mvnw clean verify
 ```
 
-49 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
+94 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
 must be running** — without one they fail rather than skip. Tests supply their own throwaway
 configuration from `src/test/resources/application.yml` and need no environment variables.
 
-JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 83% of
-instructions, 73% of branches.
+JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 97% of
+instructions, 95% of branches.
 
 CI runs `clean verify` on every push and pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
@@ -163,19 +163,15 @@ tasks, so the owner is not information it needs.
 
 ### Docs and health
 
-Verified against a running instance:
-
 | Endpoint | Port | Auth |
 |---|---|---|
-| `/swagger-ui/index.html` (`/swagger-ui.html` redirects here) | application | **none — public** |
-| `/v3/api-docs` | application | **none — public** |
+| `/swagger-ui/index.html`, `/v3/api-docs` | application | **disabled by default** — set `SPRINGDOC_ENABLED=true` |
 | `/actuator/health`, `/actuator/info`, `/actuator/metrics` | management (`9090`) | `401` without credentials |
 
-`application.yml` also lists `httptrace`, `openapi`, `prometheus` and `swagger-ui` under
-`management.endpoints.web.exposure.include`, but only three actuator endpoints are actually
-exposed. `prometheus` needs `micrometer-registry-prometheus`, which is not a dependency;
-`httptrace` needs an `HttpExchangeRepository` bean; and `openapi`/`swagger-ui` are springdoc
-paths, not actuator endpoints. The extra names are inert.
+The OpenAPI docs are off unless `SPRINGDOC_ENABLED=true`: an anonymous caller could otherwise read
+the full API shape of a service whose every other route is authenticated (see [Roadmap](#roadmap)
+item 6). `management.endpoints.web.exposure.include` lists only `health`, `info` and `metrics` — the
+three endpoints that actually exist; nothing else is exposed.
 
 ## Layout
 
