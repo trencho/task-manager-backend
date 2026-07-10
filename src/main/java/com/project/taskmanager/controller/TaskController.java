@@ -1,6 +1,7 @@
 package com.project.taskmanager.controller;
 
 import com.project.taskmanager.dto.TaskDTO;
+import com.project.taskmanager.dto.TaskResponseDTO;
 import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.mapper.TaskMapper;
@@ -32,14 +33,17 @@ public class TaskController {
     private final TaskService taskService;
 
     @GetMapping
-    public ResponseEntity<Page<Task>> getAllTasks(@AuthenticationPrincipal(expression = "username") final String username,
-                                                  final Pageable pageable) {
-        return ResponseEntity.ok(taskService.getAllTasks(username, pageable));
+    public ResponseEntity<Page<TaskResponseDTO>> getAllTasks(
+            @AuthenticationPrincipal(expression = "username") final String username,
+            final Pageable pageable) {
+        // Page.map preserves the pageable metadata, so the `page` block of the JSON is unchanged.
+        return ResponseEntity.ok(taskService.getAllTasks(username, pageable).map(taskMapper::toResponse));
     }
 
     @PostMapping
-    public ResponseEntity<Task> createTask(@AuthenticationPrincipal(expression = "username") final String username,
-                                           @Valid @RequestBody final TaskDTO taskDTO) throws URISyntaxException {
+    public ResponseEntity<TaskResponseDTO> createTask(
+            @AuthenticationPrincipal(expression = "username") final String username,
+            @Valid @RequestBody final TaskDTO taskDTO) throws URISyntaxException {
         final var task = taskMapper.toEntity(taskDTO);
         task.setUsername(username);
         // A client may create a task in any state; PENDING is only the default. This used to
@@ -50,22 +54,24 @@ public class TaskController {
         final var createdTask = taskService.createTask(task);
         final var location = new URI("/api/tasks/" + createdTask.getId());
 
-        return ResponseEntity.created(location).body(createdTask);
+        return ResponseEntity.created(location).body(taskMapper.toResponse(createdTask));
     }
 
     @GetMapping("/{taskId}")
-    public ResponseEntity<TaskDTO> getTask(@AuthenticationPrincipal(expression = "username") final String username,
-                                           @PathVariable final String taskId) {
+    public ResponseEntity<TaskResponseDTO> getTask(
+            @AuthenticationPrincipal(expression = "username") final String username,
+            @PathVariable final String taskId) {
         final var task = taskService.getTaskById(username, taskId);
-        return ResponseEntity.ok(taskMapper.toDTO(task));
+        return ResponseEntity.ok(taskMapper.toResponse(task));
     }
 
     @PutMapping("/{taskId}")
-    public ResponseEntity<TaskDTO> updateTask(@AuthenticationPrincipal(expression = "username") final String username,
-                                              @PathVariable final String taskId,
-                                              @Valid @RequestBody final TaskDTO taskDTO) {
+    public ResponseEntity<TaskResponseDTO> updateTask(
+            @AuthenticationPrincipal(expression = "username") final String username,
+            @PathVariable final String taskId,
+            @Valid @RequestBody final TaskDTO taskDTO) {
         final var task = taskService.updateTask(username, taskId, taskMapper.toEntity(taskDTO));
-        return ResponseEntity.ok(taskMapper.toDTO(task));
+        return ResponseEntity.ok(taskMapper.toResponse(task));
     }
 
     @DeleteMapping("/{taskId}")

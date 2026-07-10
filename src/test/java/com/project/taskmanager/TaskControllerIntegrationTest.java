@@ -96,6 +96,11 @@ class TaskControllerIntegrationTest {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Initial Task Title"))
                 .andExpect(jsonPath("$.content[0].description").value("Initial Task Description"))
+                // The list endpoint used to serialise the Task entity, so every item carried the
+                // owner's username. The client needs `id` (it edits and deletes by it) and has no
+                // business knowing the owner -- it can only ever see its own tasks.
+                .andExpect(jsonPath("$.content[0].id").exists())
+                .andExpect(jsonPath("$.content[0].username").doesNotExist())
                 .andExpect(jsonPath("$.page.totalElements").value(1))
                 .andExpect(jsonPath("$.page.totalPages").value(1))
                 .andExpect(jsonPath("$.page.size").value(10))
@@ -111,6 +116,8 @@ class TaskControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("New Task Title"))
                 .andExpect(jsonPath("$.description").value("New Task Description"))
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.username").doesNotExist())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
