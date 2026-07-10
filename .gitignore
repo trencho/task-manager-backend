@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local secrets for docker compose. Never commit.
+.env.local
+.env.*.local

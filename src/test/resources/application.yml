@@ -1,0 +1,25 @@
+# Test-only configuration.
+#
+# The main application.yml intentionally has no defaults for MONGODB_URI or JWT_SECRET,
+# so the app fails fast rather than starting on a credential committed to the repo.
+# Tests supply their own throwaway values here.
+#
+# Nothing in this file is a real credential. The Mongo URI is overridden at runtime by
+# MongoTestContainerConfig, which points the MongoTemplate at a Testcontainers instance.
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/task-manager
+      database: task-manager
+      authentication-database: task-manager
+
+jwt:
+  # HS256 requires a key of at least 256 bits. This is a throwaway test value.
+  secret: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+  accessTokenExpiration: 3600000
+  refreshTokenExpiration: 86400000
+
+logging:
+  level:
+    root: WARN

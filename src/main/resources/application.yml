@@ -3,21 +3,26 @@ spring:
     name: task-manager
   data:
     mongodb:
-      uri: mongodb://admin:password@mongo:27017/task-manager?authMechanism=SCRAM-SHA-256
+      # No default: the application must fail to start rather than fall back to a
+      # credential baked into the image.
+      uri: ${MONGODB_URI}
       database: task-manager
       authentication-database: task-manager
 
 jwt:
-  secret: 0a8aa3a72b3ac3b3c8e0a6dec37b22320fa0beb87200801f03cf70b6b9a53fa4
-  accessTokenExpiration: 3600000
-  refreshTokenExpiration: 86400000
+  # No default, deliberately. This key signs and validates every access token; a
+  # committed fallback is a published master credential.
+  secret: ${JWT_SECRET}
+  accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+  refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:86400000}
 
 server:
-  port: 80
+  port: ${SERVER_PORT:80}
 
 logging:
   level:
-    root: DEBUG
+    # DEBUG on a security stack routinely writes tokens and credentials to the log.
+    root: ${LOG_LEVEL:INFO}
 
 management:
   endpoints:
@@ -25,4 +30,4 @@ management:
       exposure:
         include: health, httptrace, info, metrics, openapi, prometheus, swagger-ui
   server:
-    port: 9090
+    port: ${MANAGEMENT_PORT:9090}

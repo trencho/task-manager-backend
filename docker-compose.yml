@@ -7,6 +7,12 @@ services:
       - mongo
     deploy:
       replicas: 1
+    # `:?` makes compose refuse to start when the variable is unset, instead of
+    # silently substituting an empty string. Set these in an untracked .env.local
+    # or export them; never commit their values.
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (see .env.example)}
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI (see .env.example)}
     expose:
       - 80
     image: task-manager-spring:latest
@@ -22,8 +28,10 @@ services:
     deploy:
       replicas: 1
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME (see .env.example)}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD (see .env.example)}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME (see .env.example)}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD (see .env.example)}
     expose:
       - 27017
     image: task-manager-mongo:latest
