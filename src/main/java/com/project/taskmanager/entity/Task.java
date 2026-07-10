@@ -1,5 +1,6 @@
 package com.project.taskmanager.entity;
 
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +24,7 @@ public class Task {
     private String description;
     private LocalDate dueDate;
     private TaskStatus status;
+    private Priority priority;
     private String username;
 
     public Task(final String title, final String description, final LocalDate dueDate, final TaskStatus status,

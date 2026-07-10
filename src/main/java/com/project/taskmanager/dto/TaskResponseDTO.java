@@ -1,5 +1,6 @@
 package com.project.taskmanager.dto;
 
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ public record TaskResponseDTO(
         String title,
         String description,
         LocalDate dueDate,
-        TaskStatus status) {
+        TaskStatus status,
+        Priority priority) {
 
 }

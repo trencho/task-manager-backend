@@ -3,6 +3,7 @@ package com.project.taskmanager;
 import com.project.taskmanager.config.MongoTestContainerConfig;
 import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.entity.User;
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.repository.TaskRepository;
 import com.project.taskmanager.repository.UserRepository;
@@ -70,6 +71,8 @@ class TaskControllerIntegrationTest {
         // Deliberately not PENDING: PENDING is the create-time default, so a seeded PENDING
         // could not tell "preserved the existing status" apart from "fell back to the default".
         task.setStatus(TaskStatus.IN_PROGRESS);
+        // Same reasoning: MEDIUM is the create-time default for priority.
+        task.setPriority(Priority.HIGH);
         task.setUsername(USERNAME);
         taskRepository.save(task);
 
@@ -159,6 +162,49 @@ class TaskControllerIntegrationTest {
                         .content(UPDATED_TASK_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(task.getStatus().name()));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldDefaultToMediumWhenNoPriorityIsSupplied() throws Exception {
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TASK_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority").value("MEDIUM"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldHonourThePrioritySuppliedOnCreate() throws Exception {
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\": \"Urgent Task\", \"description\": \"d\", \"priority\": \"HIGH\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority").value("HIGH"));
+    }
+
+    /**
+     * A PUT that omits `priority` must not null the field — the same trap that `status` fell into.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldPreserveTheExistingPriorityWhenUpdateOmitsIt() throws Exception {
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(UPDATED_TASK_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value(task.getPriority().name()));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldApplyANewPriorityOnUpdate() throws Exception {
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\": \"Updated Task Title\", \"description\": \"d\", \"priority\": \"LOW\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("LOW"));
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.project.taskmanager.controller;
 
 import com.project.taskmanager.dto.TaskDTO;
 import com.project.taskmanager.dto.TaskResponseDTO;
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.mapper.TaskMapper;
@@ -50,6 +51,10 @@ public class TaskController {
         // overwrite whatever the client sent, so a task could never be created as anything else.
         if (task.getStatus() == null) {
             task.setStatus(TaskStatus.PENDING);
+        }
+        // Same contract as status: the client may set it, MEDIUM when it doesn't.
+        if (task.getPriority() == null) {
+            task.setPriority(Priority.MEDIUM);
         }
         final var createdTask = taskService.createTask(task);
         final var location = new URI("/api/tasks/" + createdTask.getId());

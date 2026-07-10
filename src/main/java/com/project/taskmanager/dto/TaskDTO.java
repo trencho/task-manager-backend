@@ -1,5 +1,6 @@
 package com.project.taskmanager.dto;
 
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -15,6 +16,7 @@ public record TaskDTO(
         String description,
 
         LocalDate dueDate,
-        TaskStatus status) {
+        TaskStatus status,
+        Priority priority) {
 
 }
