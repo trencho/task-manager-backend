@@ -10,8 +10,6 @@ public interface TaskMapper {
 
     Task toEntity(TaskDTO taskDTO);
 
-    TaskDTO toDTO(Task task);
-
     /**
      * `username` has no target field on TaskResponseDTO, so MapStruct simply drops it.
      */
