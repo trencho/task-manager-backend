@@ -1,6 +1,7 @@
 package com.project.taskmanager;
 
 import com.project.taskmanager.entity.Task;
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.exception.TaskNotFoundException;
 import com.project.taskmanager.repository.TaskRepository;
@@ -47,12 +48,25 @@ class TaskServiceImplUnitTest {
         final var pageable = PageRequest.of(0, 5);
         final var tasksPage = new PageImpl<>(tasks, pageable, 2);
 
-        when(taskRepository.findByUsername(USERNAME, pageable)).thenReturn(tasksPage);
+        // `findByUsername` is gone: an unfiltered listing is search(...) with every filter null.
+        when(taskRepository.search(USERNAME, null, null, null, null, pageable)).thenReturn(tasksPage);
 
-        final var result = taskService.getAllTasks(USERNAME, pageable);
+        final var result = taskService.getAllTasks(USERNAME, null, null, null, null, pageable);
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(2);
-        verify(taskRepository, times(1)).findByUsername(USERNAME, pageable);
+        verify(taskRepository, times(1)).search(USERNAME, null, null, null, null, pageable);
+    }
+
+    @Test
+    void shouldPassEveryFilterThroughToTheRepository() {
+        final var pageable = PageRequest.of(0, 5);
+        final var dueBefore = LocalDate.now().plusDays(7);
+        when(taskRepository.search(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        taskService.getAllTasks(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, pageable);
+
+        verify(taskRepository).search(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, pageable);
     }
 
     @Test

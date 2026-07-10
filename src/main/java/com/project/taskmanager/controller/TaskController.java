@@ -2,8 +2,8 @@ package com.project.taskmanager.controller;
 
 import com.project.taskmanager.dto.TaskDTO;
 import com.project.taskmanager.dto.TaskResponseDTO;
-import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.entity.Task;
+import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.mapper.TaskMapper;
 import com.project.taskmanager.service.TaskService;
@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,10 +21,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.LocalDate;
 
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
@@ -33,12 +36,21 @@ public class TaskController {
     private final TaskMapper taskMapper;
     private final TaskService taskService;
 
+    /**
+     * All filters are optional. {@code page}, {@code size} and {@code sort} are bound from the
+     * {@link Pageable}, so {@code ?sort=dueDate,asc} works unchanged.
+     */
     @GetMapping
     public ResponseEntity<Page<TaskResponseDTO>> getAllTasks(
             @AuthenticationPrincipal(expression = "username") final String username,
+            @RequestParam(required = false) final TaskStatus status,
+            @RequestParam(required = false) final Priority priority,
+            @RequestParam(required = false) final String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dueBefore,
             final Pageable pageable) {
         // Page.map preserves the pageable metadata, so the `page` block of the JSON is unchanged.
-        return ResponseEntity.ok(taskService.getAllTasks(username, pageable).map(taskMapper::toResponse));
+        return ResponseEntity.ok(taskService.getAllTasks(username, status, priority, q, dueBefore, pageable)
+                .map(taskMapper::toResponse));
     }
 
     @PostMapping

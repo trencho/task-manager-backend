@@ -1,6 +1,8 @@
 package com.project.taskmanager.service.impl;
 
 import com.project.taskmanager.entity.Task;
+import com.project.taskmanager.enums.Priority;
+import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.exception.TaskNotFoundException;
 import com.project.taskmanager.repository.TaskRepository;
 import com.project.taskmanager.service.TaskService;
@@ -8,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
 
 @RequiredArgsConstructor
 @Service
@@ -19,8 +23,9 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
 
     @Override
-    public Page<Task> getAllTasks(final String username, final Pageable pageable) {
-        return taskRepository.findByUsername(username, pageable);
+    public Page<Task> getAllTasks(final String username, final TaskStatus status, final Priority priority,
+                                  final String q, final LocalDate dueBefore, final Pageable pageable) {
+        return taskRepository.search(username, status, priority, q, dueBefore, pageable);
     }
 
     @Override

@@ -85,6 +85,137 @@ class TaskControllerIntegrationTest {
         SecurityContextHolder.setContext(securityContext);
     }
 
+    /**
+     * Seeds a second task for the same user, plus one belonging to somebody else. The other user's
+     * task must never appear in any filtered result — scoping is not a filter, it is an invariant.
+     */
+    private void seedForSearch() {
+        final var groceries = new Task("Buy groceries", "Milk and BREAD", LocalDate.now().plusDays(2),
+                TaskStatus.PENDING, USERNAME);
+        groceries.setPriority(Priority.LOW);
+        taskRepository.save(groceries);
+
+        // MEDIUM, not HIGH: the task seeded in setUp() is already HIGH, so filtering on HIGH here
+        // would match two tasks and the assertion would say nothing about the filter.
+        final var report = new Task("Write report", "Quarterly numbers", LocalDate.now().plusDays(30),
+                TaskStatus.COMPLETED, USERNAME);
+        report.setPriority(Priority.MEDIUM);
+        taskRepository.save(report);
+
+        final var foreign = new Task("Buy groceries", "Someone else's list", LocalDate.now(),
+                TaskStatus.PENDING, "otheruser");
+        foreign.setPriority(Priority.LOW);
+        taskRepository.save(foreign);
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldFilterByStatus() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL).param("status", "COMPLETED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Write report"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldFilterByPriority() throws Exception {
+        seedForSearch();
+
+        // MEDIUM matches only "Write report": setUp()'s task is HIGH, groceries is LOW.
+        mockMvc.perform(get(BASE_URL).param("priority", "MEDIUM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Write report"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldSearchTheTitleCaseInsensitively() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL).param("q", "GROCERIES"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Buy groceries"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldSearchTheDescriptionCaseInsensitively() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL).param("q", "bread"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Buy groceries"));
+    }
+
+    /**
+     * `q` goes into a regex. Unquoted, ".*" would match every task — and a pathological pattern
+     * would hang the server. Pattern.quote makes it a literal.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldTreatRegexMetacharactersInTheQueryAsLiterals() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL).param("q", ".*"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldFilterByDueBeforeExclusively() throws Exception {
+        seedForSearch();
+
+        // The seeded task is due today; groceries in 2 days; the report in 30.
+        mockMvc.perform(get(BASE_URL).param("dueBefore", LocalDate.now().plusDays(3).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldCombineFilters() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL)
+                        .param("q", "groceries")
+                        .param("priority", "LOW")
+                        .param("status", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Buy groceries"));
+    }
+
+    /**
+     * The other user also has a task titled "Buy groceries". Filtering must never reach it.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldNeverReturnAnotherUsersTaskHoweverItIsFiltered() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL).param("q", "groceries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].description").value("Milk and BREAD"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldSortByDueDate() throws Exception {
+        seedForSearch();
+
+        mockMvc.perform(get(BASE_URL).param("sort", "dueDate,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].title").value("Write report"));
+    }
+
     @Test
     @WithMockUser(username = USERNAME)
     void testGetAllTasks() throws Exception {
