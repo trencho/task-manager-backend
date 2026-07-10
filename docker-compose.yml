@@ -13,6 +13,9 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (see .env.example)}
       MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI (see .env.example)}
+      # OpenAPI docs stay off unless explicitly switched on. Never enable them in production:
+      # they publish the full API shape of a service whose every other route is authenticated.
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
     expose:
       - 80
     image: task-manager-spring:latest

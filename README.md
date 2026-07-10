@@ -98,7 +98,8 @@ All task endpoints require `Authorization: Bearer <accessToken>`.
 | `POST` | `/api/auth/signup` | `{username, email, password}` | `200` text, or `400` if the username is taken |
 | `POST` | `/api/auth/login` | `{username, password}` | `{accessToken, refreshToken}`, or `401` |
 | `POST` | `/api/auth/refresh-token` | `{refreshToken}` | `{accessToken, refreshToken}` — **the refresh token is rotated**; or `401` |
-| `POST` | `/api/auth/logout` | `{refreshToken}` | `204`; revokes the refresh token |
+| `POST` | `/api/auth/logout` | `{refreshToken}` | `204`; revokes that refresh token |
+| `POST` | `/api/auth/logout-all` | — | `204`; revokes **every** refresh token for the caller. **Requires authentication.** |
 
 An expired refresh token is rejected and deleted; sign in again to obtain a new one.
 

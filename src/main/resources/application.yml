@@ -16,6 +16,15 @@ jwt:
   accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
   refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:86400000}
 
+# OpenAPI docs are OFF by default. /v3/api-docs and /swagger-ui answered 200 to anonymous
+# callers, publishing the full API shape of a service whose every other route is authenticated.
+# Set SPRINGDOC_ENABLED=true for local development.
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
+
 server:
   port: ${SERVER_PORT:80}
 
@@ -28,6 +37,9 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, httptrace, info, metrics, openapi, prometheus, swagger-ui
+        # Only these three exist. `prometheus` needs micrometer-registry-prometheus (absent),
+        # `httptrace` needs an HttpExchangeRepository bean, and `openapi`/`swagger-ui` are
+        # springdoc paths, not actuator endpoints. Listing them was inert.
+        include: health, info, metrics
   server:
     port: ${MANAGEMENT_PORT:9090}

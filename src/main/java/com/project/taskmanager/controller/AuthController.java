@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -89,6 +90,17 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
         refreshTokenService.deleteByToken(refreshTokenRequestDTO.refreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Revokes every refresh token belonging to the caller — "sign me out everywhere". Unlike
+     * {@code /logout}, this requires authentication: no token is presented, so the caller must
+     * prove who they are. Outstanding access tokens survive until they expire, as always.
+     */
+    @PostMapping("/logout-all")
+    public ResponseEntity<Void> logoutAll(@AuthenticationPrincipal(expression = "username") final String username) {
+        refreshTokenService.deleteByUsername(username);
         return ResponseEntity.noContent().build();
     }
 

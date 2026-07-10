@@ -6,6 +6,7 @@ import com.project.taskmanager.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -34,10 +35,18 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(requests -> requests
+                        // Ahead of the /api/auth/** permitAll below: first match wins. Revoking
+                        // every session is authenticated, because no token is presented to
+                        // establish authority -- unlike /logout, where possession of the refresh
+                        // token is the authority to revoke it.
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout-all").authenticated()
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                // Both forms: "/v3/api-docs/**" does not match the bare
+                                // "/v3/api-docs", which is the path springdoc actually serves.
+                                "/v3/api-docs",
                                 "/v3/api-docs/**",
                                 "/webjars/**")
                         .permitAll()

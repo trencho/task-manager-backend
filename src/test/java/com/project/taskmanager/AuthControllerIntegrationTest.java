@@ -15,12 +15,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -93,6 +93,28 @@ class AuthControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(asJsonString(new RefreshTokenRequestDTO("never-issued"))))
                 .andExpect(status().isNoContent());
+    }
+
+    /**
+     * Unlike single-session logout, revoking every session is an authenticated action: the
+     * caller must prove who they are, because no token is presented to establish authority.
+     * `/api/auth/**` is permitAll, so this needs its own matcher ahead of that rule.
+     */
+    @Test
+    @WithMockUser(username = "username")
+    void shouldRevokeEverySessionForTheAuthenticatedUser() throws Exception {
+        mockMvc.perform(post("/api/auth/logout-all"))
+                .andExpect(status().isNoContent());
+
+        verify(refreshTokenService).deleteByUsername("username");
+    }
+
+    @Test
+    void shouldRejectLogoutAllWhenNotAuthenticated() throws Exception {
+        mockMvc.perform(post("/api/auth/logout-all"))
+                .andExpect(status().isUnauthorized());
+
+        verify(refreshTokenService, never()).deleteByUsername(any());
     }
 
     @Test
