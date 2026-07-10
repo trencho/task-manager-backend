@@ -51,6 +51,10 @@ Copy [`.env.example`](.env.example) to `.env.local` and fill it in. `.env.local`
 | `SERVER_PORT` | no | default `80` |
 | `MANAGEMENT_PORT` | no | default `9090` |
 | `LOG_LEVEL` | no | default `INFO`. Do not ship `DEBUG`: it writes tokens and credentials to the log. |
+| `RATE_LIMIT_CAPACITY` | no | default `5`. Requests allowed per refill period, per client, per endpoint. |
+| `RATE_LIMIT_REFILL_PERIOD` | no | default `1m` |
+| `RATE_LIMIT_TRUST_FORWARDED_FOR` | no | default `false`. See [Security notes](#security-notes). |
+| `RATE_LIMIT_MAX_BUCKETS` | no | default `10000`. Caps the in-memory bucket map. |
 
 ## Running
 
@@ -95,13 +99,19 @@ All task endpoints require `Authorization: Bearer <accessToken>`.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| `POST` | `/api/auth/signup` | `{username, email, password}` | `200` text, or `400` if the username is taken |
-| `POST` | `/api/auth/login` | `{username, password}` | `{accessToken, refreshToken}`, or `401` |
+| `POST` | `/api/auth/signup` | `{username, email, password}` | `200` text, `400` if the username is taken, or `429` |
+| `POST` | `/api/auth/login` | `{username, password}` | `{accessToken, refreshToken}`, `401`, or `429` |
 | `POST` | `/api/auth/refresh-token` | `{refreshToken}` | `{accessToken, refreshToken}` — **the refresh token is rotated**; or `401` |
 | `POST` | `/api/auth/logout` | `{refreshToken}` | `204`; revokes that refresh token |
 | `POST` | `/api/auth/logout-all` | — | `204`; revokes **every** refresh token for the caller. **Requires authentication.** |
 
 An expired refresh token is rejected and deleted; sign in again to obtain a new one.
+
+**`login` and `signup` are rate-limited** to 5 requests per minute per client address, counted
+separately per endpoint. Exceeding it returns `429` with a `Retry-After` header giving the
+seconds until the allowance returns. The counters live **in the application's memory**, so they
+are per instance and reset on restart — correct for this single-instance deployment, and not a
+substitute for a distributed limiter if you ever run more than one replica.
 
 **Refresh tokens rotate.** Redeeming one invalidates it and returns a replacement, so a captured
 token is good for at most one use. Clients must store both values from the response.
@@ -116,11 +126,27 @@ is inherent to stateless JWT, which is why it is short-lived (1 hour by default)
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/api/tasks` | **Paginated.** Accepts `?page=0&size=10&sort=dueDate,asc`. Returns a Spring `Page`. |
-| `POST` | `/api/tasks` | `201 Created` with a `Location` header. `status` is optional and defaults to `PENDING`. |
+| `GET` | `/api/tasks` | **Paginated, filterable.** See below. Returns a Spring `Page`. |
+| `POST` | `/api/tasks` | `201 Created` with a `Location` header. `status` defaults to `PENDING`, `priority` to `MEDIUM`. |
 | `GET` | `/api/tasks/{taskId}` | A single task |
-| `PUT` | `/api/tasks/{taskId}` | Updates the task. Omitting `status` leaves the current status unchanged. |
+| `PUT` | `/api/tasks/{taskId}` | Updates the task. Omitting `status` or `priority` leaves the current value unchanged. |
 | `DELETE` | `/api/tasks/{taskId}` | `204 No Content` |
+
+Every task endpoint is scoped to the authenticated caller; no combination of parameters can
+return another user's task.
+
+#### Listing parameters
+
+All optional, and combinable.
+
+| Parameter | Example | Effect |
+|---|---|---|
+| `page`, `size` | `?page=0&size=10` | Standard Spring pagination |
+| `sort` | `?sort=dueDate,asc` | Sort by any task field |
+| `status` | `?status=COMPLETED` | Exact match |
+| `priority` | `?priority=HIGH` | Exact match |
+| `q` | `?q=groceries` | Case-insensitive substring of `title` **or** `description`. Treated as a literal, so `.*` matches nothing. |
+| `dueBefore` | `?dueBefore=2026-07-15` | Strictly before the given `YYYY-MM-DD` |
 
 ### Task shape
 
@@ -130,6 +156,10 @@ is inherent to stateless JWT, which is why it is short-lived (1 hour by default)
 | `description` | string | ≤ 200 chars |
 | `dueDate` | `LocalDate` | `YYYY-MM-DD` |
 | `status` | enum | `PENDING`, `IN_PROGRESS`, `COMPLETED` |
+| `priority` | enum | `LOW`, `MEDIUM`, `HIGH` |
+
+Responses additionally carry `id`. They never carry `username`: a client only ever sees its own
+tasks, so the owner is not information it needs.
 
 ### Docs and health
 
@@ -170,19 +200,19 @@ generated sources produce confusing compile errors.
 
 Candidate features, derived from this README and the gaps between it and the code:
 
-1. **Filter and search tasks** — `GET /api/tasks?status=&q=&dueBefore=`. The endpoint is already
-   paginated, so this is a query-parameter and repository change rather than a redesign.
-2. **Priority levels** — a `Priority` enum alongside `TaskStatus`, sortable.
+1. ~~**Filter and search tasks.**~~ Done — `status`, `priority`, `q` and `dueBefore` on
+   `GET /api/tasks`, combinable, on top of the existing pagination and sorting.
+2. ~~**Priority levels.**~~ Done — a `Priority` enum alongside `TaskStatus`, filterable and sortable.
 3. ~~**Let `POST /api/tasks` accept a status.**~~ Done — `status` is optional on create and
    defaults to `PENDING`, and an update that omits it no longer nulls the field.
-4. **Revoke every session for a user.** `deleteByUsername` exists on the service with no endpoint.
-   Rotation and single-session logout are done.
-5. **Rate-limit the auth endpoints.** `/login` and `/signup` are unauthenticated and unthrottled.
-6. **Gate the OpenAPI docs.** `/v3/api-docs` and `/swagger-ui/index.html` are publicly readable.
-   Set `springdoc.api-docs.enabled=false` and `springdoc.swagger-ui.enabled=false` outside dev,
-   or put them behind the same authentication as everything else.
+4. ~~**Revoke every session for a user.**~~ Done — `POST /api/auth/logout-all`.
+5. ~~**Rate-limit the auth endpoints.**~~ Done — 5 requests per minute per client on `/login`
+   and `/signup`, in-memory and per instance.
+6. ~~**Gate the OpenAPI docs.**~~ Done — `springdoc` is disabled unless `SPRINGDOC_ENABLED=true`.
 7. ~~**Return a DTO from `GET /api/tasks`.**~~ Done — every task endpoint returns `TaskResponseDTO`,
    which carries `id` and has no `username` field at all.
+
+Next up: due-date reminders, task tags/labels, and a bulk-update endpoint.
 
 ## Security notes
 
@@ -190,3 +220,8 @@ Candidate features, derived from this README and the gaps between it and the cod
   from the code, but it remains present in the git history and must be treated as compromised.
   **Rotate it.** Every token minted under the old secret is forgeable.
 - `POST /api/auth/signup` hashes passwords with BCrypt. Never insert users directly into Mongo.
+- **`RATE_LIMIT_TRUST_FORWARDED_FOR` must stay `false` unless a reverse proxy you control
+  overwrites `X-Forwarded-For`.** Any client can set that header, so trusting it on a
+  directly-exposed instance hands an attacker a fresh rate-limit bucket for every request and
+  disables the brute-force guard entirely. Enable it only in the compose/nginx deployment, where
+  the proxy replaces whatever the client sent.

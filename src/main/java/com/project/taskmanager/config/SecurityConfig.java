@@ -3,7 +3,9 @@ package com.project.taskmanager.config;
 import com.project.taskmanager.security.CustomUserDetailsService;
 import com.project.taskmanager.security.JwtAuthenticationFilter;
 import com.project.taskmanager.security.JwtTokenProvider;
+import com.project.taskmanager.security.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,6 +22,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.time.Duration;
+
 @Configuration
 @EnableMethodSecurity
 @EnableWebSecurity
@@ -29,6 +33,22 @@ public class SecurityConfig {
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtTokenProvider jwtTokenProvider;
+
+    @Value("${app.rate-limit.capacity:5}")
+    private int rateLimitCapacity;
+
+    @Value("${app.rate-limit.refill-period:1m}")
+    private Duration rateLimitRefillPeriod;
+
+    /**
+     * Off by default: X-Forwarded-For is only meaningful when a proxy you control rewrites it.
+     * Turn it on in the deployment that actually runs behind nginx, and nowhere else.
+     */
+    @Value("${app.rate-limit.trust-forwarded-for:false}")
+    private boolean rateLimitTrustForwardedFor;
+
+    @Value("${app.rate-limit.max-buckets:10000}")
+    private int rateLimitMaxBuckets;
 
     @Bean
     public SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
@@ -62,6 +82,9 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                // Ahead of the JWT filter: throttling a credential-guessing flood must not depend
+                // on any work done for a token the caller does not have.
+                .addFilterBefore(rateLimitFilter(), JwtAuthenticationFilter.class)
                 .sessionManagement(sessionManagementCustomizer -> sessionManagementCustomizer
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .build();
@@ -70,6 +93,12 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
+    }
+
+    @Bean
+    public RateLimitFilter rateLimitFilter() {
+        return new RateLimitFilter(rateLimitCapacity, rateLimitRefillPeriod, rateLimitTrustForwardedFor,
+                rateLimitMaxBuckets);
     }
 
     @Bean

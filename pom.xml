@@ -26,10 +26,17 @@
              which Docker Engine 29 (MinAPIVersion 1.40) rejects with a bare HTTP 400. -->
         <testcontainers.version>1.21.4</testcontainers.version>
 
+        <bucket4j.version>8.10.1</bucket4j.version>
+
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>

@@ -25,6 +25,18 @@ springdoc:
   swagger-ui:
     enabled: ${SPRINGDOC_ENABLED:false}
 
+# Brute-force guard on the two unauthenticated credential endpoints. The buckets live in
+# memory, so the limit is per instance and resets on restart -- correct for this
+# single-instance deployment, wrong for a horizontally scaled one.
+app:
+  rate-limit:
+    capacity: ${RATE_LIMIT_CAPACITY:5}
+    refill-period: ${RATE_LIMIT_REFILL_PERIOD:1m}
+    # Only enable behind a proxy that overwrites X-Forwarded-For. Any client can send the
+    # header, so trusting it elsewhere gives a caller a fresh bucket per request.
+    trust-forwarded-for: ${RATE_LIMIT_TRUST_FORWARDED_FOR:false}
+    max-buckets: ${RATE_LIMIT_MAX_BUCKETS:10000}
+
 server:
   port: ${SERVER_PORT:80}
 

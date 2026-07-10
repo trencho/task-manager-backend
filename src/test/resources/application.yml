@@ -20,6 +20,14 @@ jwt:
   accessTokenExpiration: 3600000
   refreshTokenExpiration: 86400000
 
+app:
+  rate-limit:
+    # The Spring context -- and so the filter's buckets -- is shared across every test method in a
+    # class. At the production capacity of 5 the integration tests would throttle each other, and
+    # the failure would depend on execution order. RateLimitFilterUnitTest is where the limit is
+    # actually exercised, with an injected capacity and no sleeping.
+    capacity: 1000
+
 logging:
   level:
     root: WARN
