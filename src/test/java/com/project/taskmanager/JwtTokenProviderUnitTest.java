@@ -1,6 +1,7 @@
 package com.project.taskmanager;
 
 import com.project.taskmanager.security.JwtTokenProvider;
+import io.jsonwebtoken.security.WeakKeyException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -75,6 +77,18 @@ class JwtTokenProviderUnitTest {
     void shouldRejectGarbage() {
         assertThat(tokenProvider.validateToken("not-a-jwt")).isFalse();
         assertThat(tokenProvider.validateToken("")).isFalse();
+    }
+
+    /**
+     * HS256 needs at least 256 bits of key. The deprecated signWith(SignatureAlgorithm,
+     * String) overload accepted anything; Keys.hmacShaKeyFor refuses, so a too-short
+     * secret now fails loudly instead of producing weakly signed tokens.
+     */
+    @Test
+    void shouldRefuseToSignWithATooShortSecret() {
+        ReflectionTestUtils.setField(tokenProvider, "jwtSecret", "short");
+
+        assertThrows(WeakKeyException.class, () -> tokenProvider.generateAccessToken(USERNAME));
     }
 
     @Test
