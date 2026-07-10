@@ -1,0 +1,8 @@
+# Normalize line endings. The Maven wrapper and shell scripts must stay LF: Docker builds
+# from the working tree, and a CRLF `#!/bin/sh` makes Linux look for an interpreter named
+# "/bin/sh\r" and fail with exit 127.
+* text=auto
+mvnw text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

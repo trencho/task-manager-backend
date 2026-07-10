@@ -45,4 +45,6 @@ services:
 networks:
   network:
     attachable: true
-    driver: overlay
+    # `overlay` is a swarm-mode driver: `docker compose up` on a plain daemon fails
+    # at network creation with "This node is not a swarm manager".
+    driver: bridge
