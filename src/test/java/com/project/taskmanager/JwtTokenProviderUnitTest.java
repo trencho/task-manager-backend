@@ -53,10 +53,20 @@ class JwtTokenProviderUnitTest {
     @Test
     void shouldRejectATamperedToken() {
         final var token = tokenProvider.generateAccessToken(USERNAME);
-        // Flip the last character of the signature.
-        final var lastChar = token.charAt(token.length() - 1);
-        final var tampered = token.substring(0, token.length() - 1) + (lastChar == 'A' ? 'B' : 'A');
 
+        // Flip the FIRST character of the signature, not the last. An HS256 signature is 32 bytes
+        // in 43 base64url characters -- 258 bits of encoding for 256 bits of data -- so the last
+        // character's low 2 bits decode to nothing. 'A' and 'B' differ only in those bits and
+        // yield byte-identical signatures, and the "tampered" token verifies. This test flaked
+        // on roughly one run in thirty: exactly the fraction of signatures ending in 'A' or 'B'.
+        // Every bit of the first character is significant.
+        final var signatureStart = token.lastIndexOf('.') + 1;
+        final var firstChar = token.charAt(signatureStart);
+        final var tampered = token.substring(0, signatureStart)
+                + (firstChar == 'A' ? 'B' : 'A')
+                + token.substring(signatureStart + 1);
+
+        assertThat(tampered).isNotEqualTo(token);
         assertThat(tokenProvider.validateToken(tampered)).isFalse();
     }
 
