@@ -7,11 +7,11 @@ import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.entity.User;
-import com.project.taskmanager.mapper.UserMapper;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.UserService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,9 +24,11 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,9 +50,6 @@ class AuthControllerIntegrationTest {
 
     @MockitoBean
     private RefreshTokenService refreshTokenService;
-
-    @MockitoBean
-    private UserMapper userMapper;
 
     @MockitoBean
     private AuthenticationManager authenticationManager;
@@ -130,12 +129,7 @@ class AuthControllerIntegrationTest {
     @Test
     void shouldRegisterUserSuccessfully() throws Exception {
         final var userRegistrationDTO = new UserRegistrationDTO("username", "email@example.com", "password");
-        final var user = new User();
-        user.setUsername("username");
-        user.setEmail("email@example.com");
-        user.setPassword("password");
 
-        when(userMapper.toEntity(any(UserRegistrationDTO.class))).thenReturn(user);
         doNothing().when(userService).registerUser(any(User.class));
 
         mockMvc.perform(post("/api/auth/signup")
@@ -143,14 +137,22 @@ class AuthControllerIntegrationTest {
                         .content(asJsonString(userRegistrationDTO)))
                 .andExpect(status().isOk())
                 .andExpect(content().string("User registered successfully!"));
+
+        // Drive the real UserMapper: assert it mapped every field of the DTO onto the entity
+        // handed to the service. Mocking the mapper here left signup's DTO->entity mapping untested.
+        final var mapped = ArgumentCaptor.forClass(User.class);
+        verify(userService).registerUser(mapped.capture());
+        assertEquals("username", mapped.getValue().getUsername());
+        assertEquals("email@example.com", mapped.getValue().getEmail());
+        assertEquals("password", mapped.getValue().getPassword());
     }
 
     @Test
     void shouldReturnBadRequestOnFailedRegistration() throws Exception {
         final var userRegistrationDTO = new UserRegistrationDTO("username", "email@example.com", "password");
 
-        when(userMapper.toEntity(any(UserRegistrationDTO.class)))
-                .thenThrow(new IllegalArgumentException("User already exists"));
+        doThrow(new IllegalArgumentException("User already exists"))
+                .when(userService).registerUser(any(User.class));
 
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
