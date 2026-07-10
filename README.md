@@ -98,8 +98,15 @@ All task endpoints require `Authorization: Bearer <accessToken>`.
 | `POST` | `/api/auth/signup` | `{username, email, password}` | `200` text, or `400` if the username is taken |
 | `POST` | `/api/auth/login` | `{username, password}` | `{accessToken, refreshToken}`, or `401` |
 | `POST` | `/api/auth/refresh-token` | `{refreshToken}` | new access token as a bare string, or `401` |
+| `POST` | `/api/auth/logout` | `{refreshToken}` | `204`; revokes the refresh token |
 
 An expired refresh token is rejected and deleted; sign in again to obtain a new one.
+
+`logout` needs no access token — possession of the refresh token is the authority to revoke it,
+and a client whose access token has already expired must still be able to sign out. It is
+idempotent: revoking an unknown token returns `204`, because a `404` would let a caller probe
+which refresh tokens exist. The outstanding **access** token stays valid until it expires; that
+is inherent to stateless JWT, which is why it is short-lived (1 hour by default).
 
 ### Tasks — `/api/tasks`
 
@@ -164,8 +171,9 @@ Candidate features, derived from this README and the gaps between it and the cod
 2. **Priority levels** — a `Priority` enum alongside `TaskStatus`, sortable.
 3. ~~**Let `POST /api/tasks` accept a status.**~~ Done — `status` is optional on create and
    defaults to `PENDING`, and an update that omits it no longer nulls the field.
-4. **Refresh-token rotation and logout.** `deleteByToken` and `deleteByUsername` exist on the
-   service and no endpoint calls them, so tokens cannot be revoked.
+4. **Refresh-token rotation.** `POST /api/auth/logout` now revokes a token, but `refresh-token`
+   still returns a new access token without rotating the refresh token itself, and
+   `deleteByUsername` (revoke every session) has no endpoint.
 5. **Rate-limit the auth endpoints.** `/login` and `/signup` are unauthenticated and unthrottled.
 6. **Gate the OpenAPI docs.** `/v3/api-docs` and `/swagger-ui/index.html` are publicly readable.
    Set `springdoc.api-docs.enabled=false` and `springdoc.swagger-ui.enabled=false` outside dev,

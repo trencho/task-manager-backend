@@ -27,6 +27,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -61,6 +63,45 @@ class AuthControllerIntegrationTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Possession of the refresh token is the authority to revoke it, so logout is permitted
+     * without a valid access token — a client whose access token has already expired must
+     * still be able to sign out.
+     */
+    @Test
+    void shouldRevokeTheRefreshTokenOnLogout() throws Exception {
+        final var request = new RefreshTokenRequestDTO("refresh-token");
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(asJsonString(request)))
+                .andExpect(status().isNoContent());
+
+        verify(refreshTokenService).deleteByToken("refresh-token");
+    }
+
+    /**
+     * Logout is idempotent: signing out twice, or with a token the server has never seen,
+     * is a success. Reporting 404 would let a caller probe which refresh tokens exist.
+     */
+    @Test
+    void shouldTreatLogoutOfAnUnknownTokenAsSuccess() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(asJsonString(new RefreshTokenRequestDTO("never-issued"))))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldRejectLogoutWithoutARefreshToken() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verify(refreshTokenService, never()).deleteByToken(any());
     }
 
     @Test

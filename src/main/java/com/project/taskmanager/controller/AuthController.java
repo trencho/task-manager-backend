@@ -72,4 +72,19 @@ public class AuthController {
         }
     }
 
+    /**
+     * Revokes the refresh token so it can no longer mint access tokens. Deliberately does not
+     * require a valid access token: possession of the refresh token is the authority to revoke
+     * it, and a client whose access token has already expired must still be able to sign out.
+     * <p>
+     * Idempotent — revoking a token the server never issued is a success. A 404 would let a
+     * caller probe which refresh tokens exist. The outstanding access token remains valid until
+     * it expires; that is inherent to stateless JWT, and is why the access token is short-lived.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
+        refreshTokenService.deleteByToken(refreshTokenRequestDTO.refreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
 }

@@ -43,13 +43,12 @@ public class SecurityConfig {
                         .permitAll()
                         .anyRequest().authenticated()
                 )
-                .logout(logoutCustomizer -> logoutCustomizer
-                        .logoutUrl("/api/auth/logout")
-                        .logoutSuccessUrl("/api/auth/login?logout")
-                        .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID")
-                        .permitAll()
-                )
+                // No .logout(...) customizer. Spring Security's LogoutFilter would intercept
+                // POST /api/auth/logout before it reached AuthController, answering 302 to a
+                // login URL. Its work -- invalidating an HTTP session, clearing JSESSIONID --
+                // is meaningless here: the session policy is STATELESS and auth is a bearer
+                // token. Revoking the refresh token is the only thing logout can actually do,
+                // and AuthController does it.
                 .exceptionHandling(exceptionHandlingCustomizer -> exceptionHandlingCustomizer
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authenticationProvider(authenticationProvider())
