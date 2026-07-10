@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -40,7 +41,7 @@ public class JwtTokenProvider {
 
     public String generateAccessToken(final String username) {
         final var now = new Date();
-        return buildToken(username, now, new Date(now.getTime() + accessTokenExpiration));
+        return buildToken(username, now, new Date(now.getTime() + accessTokenExpiration), null);
     }
 
     public RefreshToken generateRefreshToken(final String username) {
@@ -49,18 +50,31 @@ public class JwtTokenProvider {
         // them from separate clock reads let them disagree by a millisecond.
         final var expiration = new Date(now.getTime() + refreshTokenExpiration);
 
+        // A refresh token is a database key, so it must be unique. `iat` and `exp` have
+        // second resolution, so without a random `jti` two tokens minted for the same user
+        // within the same second are byte-identical — which silently broke rotation (the
+        // "new" token equalled the old one) and made two logins in one second collide.
+        final var tokenId = UUID.randomUUID().toString();
+
         return RefreshToken.builder()
-                .token(buildToken(username, now, expiration))
+                .token(buildToken(username, now, expiration, tokenId))
                 .username(username)
                 .expiryDate(expiration.toInstant())
                 .build();
     }
 
-    private String buildToken(final String username, final Date issuedAt, final Date expiration) {
-        return Jwts.builder()
+    private String buildToken(final String username, final Date issuedAt, final Date expiration,
+                              final String tokenId) {
+        final var builder = Jwts.builder()
                 .subject(username)
                 .issuedAt(issuedAt)
-                .expiration(expiration)
+                .expiration(expiration);
+
+        if (tokenId != null) {
+            builder.id(tokenId);
+        }
+
+        return builder
                 .signWith(signingKey(), Jwts.SIG.HS256)
                 .compact();
     }

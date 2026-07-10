@@ -63,8 +63,13 @@ public class AuthController {
         }
     }
 
+    /**
+     * Returns a new access token <em>and a rotated refresh token</em>. The presented refresh
+     * token is invalidated, so a captured copy is good for at most one use. Clients must store
+     * both values from the response.
+     */
     @PostMapping("/refresh-token")
-    public ResponseEntity<String> refreshToken(@RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
+    public ResponseEntity<Object> refreshToken(@Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
         try {
             return ResponseEntity.ok(refreshTokenService.refreshAccessToken(refreshTokenRequestDTO.refreshToken()));
         } catch (RuntimeException e) {

@@ -2,6 +2,7 @@ package com.project.taskmanager;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.taskmanager.dto.RefreshTokenRequestDTO;
+import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.entity.RefreshToken;
@@ -178,13 +179,16 @@ class AuthControllerIntegrationTest {
         final var refreshTokenRequest = new RefreshTokenRequestDTO(refreshToken);
         final var newAccessToken = "new-access-token";
 
-        when(refreshTokenService.refreshAccessToken(refreshToken)).thenReturn(newAccessToken);
+        when(refreshTokenService.refreshAccessToken(refreshToken)).thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
 
         mockMvc.perform(post("/api/auth/refresh-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(asJsonString(refreshTokenRequest)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(newAccessToken));
+                // Rotation: the response carries a new refresh token too, and it is not the
+                // one the caller presented.
+                .andExpect(jsonPath("$.accessToken").value(newAccessToken))
+                .andExpect(jsonPath("$.refreshToken").value("rotated-refresh-token"));
     }
 
     @Test

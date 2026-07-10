@@ -114,11 +114,13 @@ class AuthControllerUnitTest {
         final var refreshToken = "valid-refresh-token";
         final var newAccessToken = "new-access-token";
 
-        when(refreshTokenService.refreshAccessToken(refreshToken)).thenReturn(newAccessToken);
+        when(refreshTokenService.refreshAccessToken(refreshToken)).thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
 
         final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken));
 
-        assertEquals(newAccessToken, response.getBody());
+        final var body = (TokenResponseDTO) response.getBody();
+        assertEquals(newAccessToken, body.accessToken());
+        assertEquals("rotated-refresh-token", body.refreshToken());
     }
 
     @Test

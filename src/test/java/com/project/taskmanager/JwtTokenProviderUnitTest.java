@@ -102,6 +102,22 @@ class JwtTokenProviderUnitTest {
         assertThat(tokenProvider.getUsername(refreshToken.getToken())).isEqualTo(USERNAME);
     }
 
+    /**
+     * A refresh token is a database key, so it must be unique. Built from only subject, iat and
+     * exp — all second-resolution — two tokens minted for the same user within the same second
+     * were byte-identical. That silently broke rotation (the "new" token equalled the old one)
+     * and made two logins in the same second share a refresh token.
+     */
+    @Test
+    void shouldMintADistinctRefreshTokenEveryTime() {
+        final var first = tokenProvider.generateRefreshToken(USERNAME);
+        final var second = tokenProvider.generateRefreshToken(USERNAME);
+
+        assertThat(first.getToken()).isNotEqualTo(second.getToken());
+        assertThat(tokenProvider.getUsername(first.getToken())).isEqualTo(USERNAME);
+        assertThat(tokenProvider.getUsername(second.getToken())).isEqualTo(USERNAME);
+    }
+
     @Test
     void shouldResolveABearerToken() {
         final var request = mock(HttpServletRequest.class);

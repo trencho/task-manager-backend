@@ -1,5 +1,6 @@
 package com.project.taskmanager.service.impl;
 
+import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.repository.RefreshTokenRepository;
 import com.project.taskmanager.security.JwtTokenProvider;
@@ -24,8 +25,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return refreshTokenRepository.save(refreshToken);
     }
 
+    /**
+     * Exchanges a refresh token for a new access token <em>and a new refresh token</em>, and
+     * deletes the one presented. Rotation means a captured refresh token has a single use: once
+     * the legitimate client redeems it, the copy is dead. Without it, a token stolen at any point
+     * stayed usable for its whole lifetime.
+     */
     @Override
-    public String refreshAccessToken(final String refreshToken) {
+    @Transactional
+    public TokenResponseDTO refreshAccessToken(final String refreshToken) {
         final var storedToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RuntimeException("Refresh token not found"));
 
@@ -33,7 +41,11 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         // kept minting access tokens for as long as the row survived.
         verifyExpiration(storedToken);
 
-        return jwtTokenProvider.generateAccessToken(storedToken.getUsername());
+        final var username = storedToken.getUsername();
+        refreshTokenRepository.delete(storedToken);
+        final var rotatedToken = refreshTokenRepository.save(jwtTokenProvider.generateRefreshToken(username));
+
+        return new TokenResponseDTO(jwtTokenProvider.generateAccessToken(username), rotatedToken.getToken());
     }
 
     @Override

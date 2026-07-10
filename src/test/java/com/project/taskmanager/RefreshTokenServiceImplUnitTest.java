@@ -48,10 +48,38 @@ class RefreshTokenServiceImplUnitTest {
     @Test
     void shouldIssueAccessTokenForValidRefreshToken() {
         final var stored = tokenExpiringAt(Instant.now().plus(1, ChronoUnit.HOURS));
+        final var rotated = RefreshToken.builder().token("rotated-token").username(USERNAME)
+                .expiryDate(Instant.now().plus(1, ChronoUnit.DAYS)).build();
         when(refreshTokenRepository.findByToken(TOKEN)).thenReturn(Optional.of(stored));
         when(jwtTokenProvider.generateAccessToken(USERNAME)).thenReturn("new-access-token");
+        when(jwtTokenProvider.generateRefreshToken(USERNAME)).thenReturn(rotated);
+        when(refreshTokenRepository.save(rotated)).thenReturn(rotated);
 
-        assertEquals("new-access-token", refreshTokenService.refreshAccessToken(TOKEN));
+        final var response = refreshTokenService.refreshAccessToken(TOKEN);
+
+        assertEquals("new-access-token", response.accessToken());
+        assertEquals("rotated-token", response.refreshToken());
+    }
+
+    /**
+     * Rotation: the presented token is deleted, so a captured copy is good for a single use.
+     * Without this a stolen refresh token stayed valid for its whole lifetime.
+     */
+    @Test
+    void shouldRotateTheRefreshTokenAndDeleteTheOldOne() {
+        final var stored = tokenExpiringAt(Instant.now().plus(1, ChronoUnit.HOURS));
+        final var rotated = RefreshToken.builder().token("rotated-token").username(USERNAME)
+                .expiryDate(Instant.now().plus(1, ChronoUnit.DAYS)).build();
+        when(refreshTokenRepository.findByToken(TOKEN)).thenReturn(Optional.of(stored));
+        when(jwtTokenProvider.generateAccessToken(USERNAME)).thenReturn("new-access-token");
+        when(jwtTokenProvider.generateRefreshToken(USERNAME)).thenReturn(rotated);
+        when(refreshTokenRepository.save(rotated)).thenReturn(rotated);
+
+        final var response = refreshTokenService.refreshAccessToken(TOKEN);
+
+        verify(refreshTokenRepository).delete(stored);
+        verify(refreshTokenRepository).save(rotated);
+        assertThat(response.refreshToken()).isNotEqualTo(TOKEN);
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.project.taskmanager.service;
 
+import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.entity.RefreshToken;
 
 import java.util.Optional;
@@ -8,7 +9,7 @@ public interface RefreshTokenService {
 
     RefreshToken createRefreshToken(String username);
 
-    String refreshAccessToken(String refreshToken);
+    TokenResponseDTO refreshAccessToken(String refreshToken);
 
     Optional<RefreshToken> findByToken(String token);
 
