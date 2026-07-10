@@ -181,8 +181,8 @@ Candidate features, derived from this README and the gaps between it and the cod
 6. **Gate the OpenAPI docs.** `/v3/api-docs` and `/swagger-ui/index.html` are publicly readable.
    Set `springdoc.api-docs.enabled=false` and `springdoc.swagger-ui.enabled=false` outside dev,
    or put them behind the same authentication as everything else.
-7. **Return a DTO from `GET /api/tasks`.** It serialises the `Task` entity directly, so each item
-   carries the owner's `username` — redundant, and it leaks the field into the response body.
+7. ~~**Return a DTO from `GET /api/tasks`.**~~ Done — every task endpoint returns `TaskResponseDTO`,
+   which carries `id` and has no `username` field at all.
 
 ## Security notes
 
