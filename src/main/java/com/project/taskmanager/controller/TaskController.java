@@ -42,7 +42,11 @@ public class TaskController {
                                            @Valid @RequestBody final TaskDTO taskDTO) throws URISyntaxException {
         final var task = taskMapper.toEntity(taskDTO);
         task.setUsername(username);
-        task.setStatus(TaskStatus.PENDING);
+        // A client may create a task in any state; PENDING is only the default. This used to
+        // overwrite whatever the client sent, so a task could never be created as anything else.
+        if (task.getStatus() == null) {
+            task.setStatus(TaskStatus.PENDING);
+        }
         final var createdTask = taskService.createTask(task);
         final var location = new URI("/api/tasks/" + createdTask.getId());
 

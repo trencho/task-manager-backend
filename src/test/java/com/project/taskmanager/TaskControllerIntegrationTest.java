@@ -67,7 +67,9 @@ class TaskControllerIntegrationTest {
         task.setTitle("Initial Task Title");
         task.setDescription("Initial Task Description");
         task.setDueDate(LocalDate.now());
-        task.setStatus(TaskStatus.PENDING);
+        // Deliberately not PENDING: PENDING is the create-time default, so a seeded PENDING
+        // could not tell "preserved the existing status" apart from "fell back to the default".
+        task.setStatus(TaskStatus.IN_PROGRESS);
         task.setUsername(USERNAME);
         taskRepository.save(task);
 
@@ -112,6 +114,54 @@ class TaskControllerIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldDefaultToPendingWhenNoStatusIsSupplied() throws Exception {
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TASK_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    /**
+     * The client's status used to be discarded: createTask overwrote it with PENDING even though
+     * TaskDTO exposes the field, so a task could never be created in any other state.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldHonourTheStatusSuppliedOnCreate() throws Exception {
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\": \"Started Task\", \"description\": \"d\", \"status\": \"IN_PROGRESS\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    /**
+     * A PUT that omits `status` used to null the field out, because updateTask copied the
+     * incoming value unconditionally. UPDATED_TASK_JSON omits it, and no assertion caught it.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldPreserveTheExistingStatusWhenUpdateOmitsIt() throws Exception {
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(UPDATED_TASK_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(task.getStatus().name()));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldApplyANewStatusOnUpdate() throws Exception {
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\": \"Updated Task Title\", \"description\": \"d\", \"status\": \"COMPLETED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 
     @Test

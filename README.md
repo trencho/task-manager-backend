@@ -106,9 +106,9 @@ An expired refresh token is rejected and deleted; sign in again to obtain a new 
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/api/tasks` | **Paginated.** Accepts `?page=0&size=10&sort=dueDate,asc`. Returns a Spring `Page`. |
-| `POST` | `/api/tasks` | `201 Created` with a `Location` header. Status is always set to `PENDING`; a status in the body is ignored. |
+| `POST` | `/api/tasks` | `201 Created` with a `Location` header. `status` is optional and defaults to `PENDING`. |
 | `GET` | `/api/tasks/{taskId}` | A single task |
-| `PUT` | `/api/tasks/{taskId}` | Full update, including `status` |
+| `PUT` | `/api/tasks/{taskId}` | Updates the task. Omitting `status` leaves the current status unchanged. |
 | `DELETE` | `/api/tasks/{taskId}` | `204 No Content` |
 
 ### Task shape
@@ -162,8 +162,8 @@ Candidate features, derived from this README and the gaps between it and the cod
 1. **Filter and search tasks** — `GET /api/tasks?status=&q=&dueBefore=`. The endpoint is already
    paginated, so this is a query-parameter and repository change rather than a redesign.
 2. **Priority levels** — a `Priority` enum alongside `TaskStatus`, sortable.
-3. **Let `POST /api/tasks` accept a status.** Today it hard-codes `PENDING` and silently discards
-   whatever the client sent, which is surprising given `TaskDTO` exposes the field.
+3. ~~**Let `POST /api/tasks` accept a status.**~~ Done — `status` is optional on create and
+   defaults to `PENDING`, and an update that omits it no longer nulls the field.
 4. **Refresh-token rotation and logout.** `deleteByToken` and `deleteByUsername` exist on the
    service and no endpoint calls them, so tokens cannot be revoked.
 5. **Rate-limit the auth endpoints.** `/login` and `/signup` are unauthenticated and unthrottled.

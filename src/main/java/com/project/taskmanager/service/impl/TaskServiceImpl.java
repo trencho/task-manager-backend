@@ -47,7 +47,11 @@ public class TaskServiceImpl implements TaskService {
             existingTask.setTitle(task.getTitle());
             existingTask.setDescription(task.getDescription());
             existingTask.setDueDate(task.getDueDate());
-            existingTask.setStatus(task.getStatus());
+            // An update that omits `status` leaves it alone. Copying unconditionally nulled the
+            // field out for any client that sent only the editable text fields.
+            if (task.getStatus() != null) {
+                existingTask.setStatus(task.getStatus());
+            }
 
             return taskRepository.save(existingTask);
         }
