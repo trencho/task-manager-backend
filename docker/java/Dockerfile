@@ -9,7 +9,7 @@
 ################################################################################
 
 # Create a stage for resolving and downloading dependencies.
-FROM eclipse-temurin:21-jdk-jammy AS deps
+FROM eclipse-temurin:21-jdk-jammy@sha256:9d8dcf999b0bce2453e913823595a5ff2a4e8e9e5d5241b45280d0ff069818ec AS deps
 
 WORKDIR /build
 
@@ -61,12 +61,12 @@ RUN java -Djarmode=layertools -jar target/app.jar extract --destination target/e
 # image from the install or build stage where the necessary files are copied
 # from the install stage.
 #
-# The example below uses eclipse-turmin's JRE image as the foundation for running the app.
-# By specifying the "21-jre-jammy" tag, it will also use whatever happens to be the
-# most recent version of that tag when you build your Dockerfile.
-# If reproducability is important, consider using a specific digest SHA, like
-# eclipse-temurin@sha256:99cede493dfd88720b610eb8077c8688d3cca50003d76d1d539b0efc8cca72b4.
-FROM eclipse-temurin:21-jre-jammy AS final
+# The example below uses eclipse-temurin's JRE image as the foundation for running the app.
+# Both stages pin the digest as well as the tag: a bare "21-jre-jammy" resolves to whatever
+# that tag points at on the day of the build, so two builds of the same commit can differ.
+# The tag is kept alongside the digest only so a human can read which image this is.
+# Dependabot proposes digest bumps, which is how these stay current.
+FROM eclipse-temurin:21-jre-jammy@sha256:d63bd8d9b171999cbed8576f2c76e874dd4856791a358536e5c4d407e77edc13 AS final
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
