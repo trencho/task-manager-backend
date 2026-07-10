@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build + test (JDK 21)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned to 21 on purpose. The pom targets Java 21, and on JDK 23+ javac no longer
+      # runs annotation processors found on the classpath, so Lombok and MapStruct
+      # silently generate nothing and the build dies with ~30 "cannot find symbol"
+      # errors that look like broken source.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build and test
+        # ubuntu-latest runners ship a running Docker daemon, which the Testcontainers
+        # -backed TaskControllerIntegrationTest needs. Testcontainers is pinned to
+        # 1.21.4 in the pom; anything older speaks a Docker API the engine rejects.
+        run: ./mvnw -B clean verify
+
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: warn
