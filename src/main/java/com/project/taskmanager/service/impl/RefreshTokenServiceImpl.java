@@ -29,6 +29,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         final var storedToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RuntimeException("Refresh token not found"));
 
+        // Rejects and deletes an expired token. Without this an expired refresh token
+        // kept minting access tokens for as long as the row survived.
+        verifyExpiration(storedToken);
+
         return jwtTokenProvider.generateAccessToken(storedToken.getUsername());
     }
 
