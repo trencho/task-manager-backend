@@ -10,6 +10,25 @@ updates:
       # One PR per week for the routine bumps, instead of five that each need a CI run.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Spring Boot 4.x removes org.springframework.boot.test.mock.mockito.MockBean, which
+      # AuthControllerIntegrationTest still imports. Dependabot opened this bump and CI
+      # caught it. Migrate deliberately, not through an automated PR.
+      - dependency-name: "org.springframework.boot:*"
+        update-types: [version-update:semver-major]
+
+      # springdoc 3.x is a breaking major aligned with Spring Boot 4.
+      - dependency-name: "org.springdoc:*"
+        update-types: [version-update:semver-major]
+
+      # mapstruct's only newer release is 1.7.0.Beta2. A beta annotation processor has no
+      # business in a build.
+      - dependency-name: "org.mapstruct:*"
+
+      # Testcontainers is pinned above the Spring Boot BOM on purpose: <= 1.21.3 speaks a
+      # Docker API that Engine 29 rejects. Never let it drift downward.
+      - dependency-name: "org.testcontainers:*"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
@@ -22,3 +41,12 @@ updates:
       - /docker/mongo
     schedule:
       interval: weekly
+    ignore:
+      # The pom targets Java 21 and the build only works on 21: since JDK 23, javac stops
+      # running annotation processors found on the classpath, so Lombok and MapStruct
+      # generate nothing. Keep both stages on the 21 line.
+      - dependency-name: "eclipse-temurin"
+        update-types: [version-update:semver-major]
+      # Stay on MongoDB's 8.0 line; 8.1+ are rapid releases.
+      - dependency-name: "mongo"
+        update-types: [version-update:semver-major, version-update:semver-minor]
