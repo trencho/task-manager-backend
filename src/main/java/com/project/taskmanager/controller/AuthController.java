@@ -50,8 +50,8 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody final UserLoginDTO userLoginDTO) {
         try {
             final var username = userLoginDTO.username();
-            final var authentication = authenticationManager
-                    .authenticate(new UsernamePasswordAuthenticationToken(username, userLoginDTO.password()));
+            final var authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, userLoginDTO.password()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -70,7 +70,8 @@ public class AuthController {
      * both values from the response.
      */
     @PostMapping("/refresh-token")
-    public ResponseEntity<Object> refreshToken(@Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
+    public ResponseEntity<Object> refreshToken(
+            @Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
         try {
             return ResponseEntity.ok(refreshTokenService.refreshAccessToken(refreshTokenRequestDTO.refreshToken()));
         } catch (RuntimeException e) {
@@ -103,5 +104,4 @@ public class AuthController {
         refreshTokenService.deleteByUsername(username);
         return ResponseEntity.noContent().build();
     }
-
 }

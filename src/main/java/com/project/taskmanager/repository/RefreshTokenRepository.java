@@ -1,9 +1,8 @@
 package com.project.taskmanager.repository;
 
 import com.project.taskmanager.entity.RefreshToken;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
 import java.util.Optional;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface RefreshTokenRepository extends MongoRepository<RefreshToken, String> {
 
@@ -12,5 +11,4 @@ public interface RefreshTokenRepository extends MongoRepository<RefreshToken, St
     void deleteByToken(String token);
 
     void deleteByUsername(String username);
-
 }

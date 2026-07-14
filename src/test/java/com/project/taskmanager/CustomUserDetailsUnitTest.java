@@ -1,12 +1,11 @@
 package com.project.taskmanager;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.project.taskmanager.entity.User;
 import com.project.taskmanager.security.CustomUserDetails;
-import org.junit.jupiter.api.Test;
-
 import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class CustomUserDetailsUnitTest {
 
@@ -22,9 +21,7 @@ class CustomUserDetailsUnitTest {
     void shouldMapEveryRoleToAGrantedAuthority() {
         final var details = new CustomUserDetails(user(Set.of("USER", "ADMIN")));
 
-        assertThat(details.getAuthorities())
-                .extracting(Object::toString)
-                .containsExactlyInAnyOrder("USER", "ADMIN");
+        assertThat(details.getAuthorities()).extracting(Object::toString).containsExactlyInAnyOrder("USER", "ADMIN");
     }
 
     @Test

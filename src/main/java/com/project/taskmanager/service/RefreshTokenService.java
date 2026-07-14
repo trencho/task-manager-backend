@@ -2,7 +2,6 @@ package com.project.taskmanager.service;
 
 import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.entity.RefreshToken;
-
 import java.util.Optional;
 
 public interface RefreshTokenService {
@@ -20,5 +19,4 @@ public interface RefreshTokenService {
     void deleteByUsername(String userId);
 
     Optional<RefreshToken> verifyExpiration(RefreshToken token);
-
 }

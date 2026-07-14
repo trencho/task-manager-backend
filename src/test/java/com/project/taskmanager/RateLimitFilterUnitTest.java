@@ -1,13 +1,5 @@
 package com.project.taskmanager;
 
-import com.project.taskmanager.security.RateLimitFilter;
-import jakarta.servlet.FilterChain;
-import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-
-import java.time.Duration;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
@@ -15,6 +7,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+
+import com.project.taskmanager.security.RateLimitFilter;
+import jakarta.servlet.FilterChain;
+import java.time.Duration;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
  * The capacity is injected, so exhausting a bucket takes two requests rather than five and no
@@ -96,8 +95,9 @@ class RateLimitFilterUnitTest {
     void shouldNotFilterAnyOtherRoute() throws Exception {
         final var rateLimitFilter = filter(false);
 
-        for (final var uri : new String[]{"/api/auth/refresh-token", "/api/auth/logout", "/api/auth/logout-all",
-                "/api/tasks", "/api/auth/login/extra"}) {
+        for (final var uri : new String[] {
+            "/api/auth/refresh-token", "/api/auth/logout", "/api/auth/logout-all", "/api/tasks", "/api/auth/login/extra"
+        }) {
             for (var i = 0; i < CAPACITY + 1; i++) {
                 final var response = new MockHttpServletResponse();
                 rateLimitFilter.doFilter(post(uri), response, filterChain);
@@ -206,7 +206,7 @@ class RateLimitFilterUnitTest {
         for (var i = 0; i < CAPACITY; i++) {
             rateLimitFilter.doFilter(post("/api/auth/login"), new MockHttpServletResponse(), filterChain);
         }
-        for (final var addr : new String[]{"10.0.0.2", "10.0.0.3"}) {
+        for (final var addr : new String[] {"10.0.0.2", "10.0.0.3"}) {
             final var request = post("/api/auth/login");
             request.setRemoteAddr(addr);
             rateLimitFilter.doFilter(request, new MockHttpServletResponse(), filterChain);

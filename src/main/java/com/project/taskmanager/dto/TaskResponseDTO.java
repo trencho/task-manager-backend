@@ -2,7 +2,6 @@ package com.project.taskmanager.dto;
 
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
-
 import java.time.LocalDate;
 
 /**
@@ -13,11 +12,4 @@ import java.time.LocalDate;
  * {@link TaskDTO} remains the write side, where the bean-validation constraints live.
  */
 public record TaskResponseDTO(
-        String id,
-        String title,
-        String description,
-        LocalDate dueDate,
-        TaskStatus status,
-        Priority priority) {
-
-}
+        String id, String title, String description, LocalDate dueDate, TaskStatus status, Priority priority) {}

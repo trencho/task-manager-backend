@@ -1,20 +1,17 @@
 package com.project.taskmanager.security;
 
 import com.project.taskmanager.entity.User;
+import java.util.Collection;
+import java.util.stream.Collectors;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
-import java.util.stream.Collectors;
 
 public record CustomUserDetails(User user) implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return user.getRoles().stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toSet());
+        return user.getRoles().stream().map(SimpleGrantedAuthority::new).collect(Collectors.toSet());
     }
 
     @Override
@@ -46,5 +43,4 @@ public record CustomUserDetails(User user) implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
-
 }

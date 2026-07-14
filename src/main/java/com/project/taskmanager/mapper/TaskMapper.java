@@ -14,5 +14,4 @@ public interface TaskMapper {
      * `username` has no target field on TaskResponseDTO, so MapStruct simply drops it.
      */
     TaskResponseDTO toResponse(Task task);
-
 }

@@ -5,11 +5,10 @@ import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.repository.RefreshTokenRepository;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
@@ -34,7 +33,8 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public TokenResponseDTO refreshAccessToken(final String refreshToken) {
-        final var storedToken = refreshTokenRepository.findByToken(refreshToken)
+        final var storedToken = refreshTokenRepository
+                .findByToken(refreshToken)
                 .orElseThrow(() -> new RuntimeException("Refresh token not found"));
 
         // Rejects and deletes an expired token. Without this an expired refresh token
@@ -76,5 +76,4 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
         return Optional.of(token);
     }
-
 }

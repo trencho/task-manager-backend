@@ -7,6 +7,9 @@ import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.mapper.TaskMapper;
 import com.project.taskmanager.service.TaskService;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,10 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.time.LocalDate;
 
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
@@ -48,14 +47,16 @@ public class TaskController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dueBefore,
             final Pageable pageable) {
         // Page.map preserves the pageable metadata, so the `page` block of the JSON is unchanged.
-        return ResponseEntity.ok(taskService.getAllTasks(username, status, priority, q, dueBefore, pageable)
+        return ResponseEntity.ok(taskService
+                .getAllTasks(username, status, priority, q, dueBefore, pageable)
                 .map(taskMapper::toResponse));
     }
 
     @PostMapping
     public ResponseEntity<TaskResponseDTO> createTask(
             @AuthenticationPrincipal(expression = "username") final String username,
-            @Valid @RequestBody final TaskDTO taskDTO) throws URISyntaxException {
+            @Valid @RequestBody final TaskDTO taskDTO)
+            throws URISyntaxException {
         final var task = taskMapper.toEntity(taskDTO);
         task.setUsername(username);
         // A client may create a task in any state; PENDING is only the default. This used to
@@ -91,10 +92,10 @@ public class TaskController {
     }
 
     @DeleteMapping("/{taskId}")
-    public ResponseEntity<Void> deleteTask(@AuthenticationPrincipal(expression = "username") final String username,
-                                           @PathVariable final String taskId) {
+    public ResponseEntity<Void> deleteTask(
+            @AuthenticationPrincipal(expression = "username") final String username,
+            @PathVariable final String taskId) {
         taskService.deleteTask(username, taskId);
         return ResponseEntity.noContent().build();
     }
-
 }

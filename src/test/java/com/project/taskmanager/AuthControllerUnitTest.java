@@ -1,5 +1,12 @@
 package com.project.taskmanager;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.project.taskmanager.controller.AuthController;
 import com.project.taskmanager.dto.RefreshTokenRequestDTO;
 import com.project.taskmanager.dto.TokenResponseDTO;
@@ -21,13 +28,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerUnitTest {
@@ -114,7 +114,8 @@ class AuthControllerUnitTest {
         final var refreshToken = "valid-refresh-token";
         final var newAccessToken = "new-access-token";
 
-        when(refreshTokenService.refreshAccessToken(refreshToken)).thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
+        when(refreshTokenService.refreshAccessToken(refreshToken))
+                .thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
 
         final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken));
 
@@ -127,11 +128,11 @@ class AuthControllerUnitTest {
     void shouldReturnUnauthorizedForInvalidRefreshToken() {
         final var refreshToken = "invalid-refresh-token";
 
-        when(refreshTokenService.refreshAccessToken(refreshToken)).thenThrow(new RuntimeException("Refresh token not found"));
+        when(refreshTokenService.refreshAccessToken(refreshToken))
+                .thenThrow(new RuntimeException("Refresh token not found"));
 
         final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken));
 
         assertEquals("Refresh token not found", response.getBody());
     }
-
 }

@@ -1,5 +1,8 @@
 package com.project.taskmanager.entity;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,10 +13,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 
 @Document(collection = "users")
 @Data
@@ -37,9 +36,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
-                .map(SimpleGrantedAuthority::new)
-                .toList();
+        return roles.stream().map(SimpleGrantedAuthority::new).toList();
     }
 
     @Override
@@ -61,5 +58,4 @@ public class User implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
-
 }

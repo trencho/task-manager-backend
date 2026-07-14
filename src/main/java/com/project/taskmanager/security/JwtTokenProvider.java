@@ -6,14 +6,13 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.UUID;
+import javax.crypto.SecretKey;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
@@ -63,20 +62,14 @@ public class JwtTokenProvider {
                 .build();
     }
 
-    private String buildToken(final String username, final Date issuedAt, final Date expiration,
-                              final String tokenId) {
-        final var builder = Jwts.builder()
-                .subject(username)
-                .issuedAt(issuedAt)
-                .expiration(expiration);
+    private String buildToken(final String username, final Date issuedAt, final Date expiration, final String tokenId) {
+        final var builder = Jwts.builder().subject(username).issuedAt(issuedAt).expiration(expiration);
 
         if (tokenId != null) {
             builder.id(tokenId);
         }
 
-        return builder
-                .signWith(signingKey(), Jwts.SIG.HS256)
-                .compact();
+        return builder.signWith(signingKey(), Jwts.SIG.HS256).compact();
     }
 
     public String getUsername(final String token) {
@@ -110,5 +103,4 @@ public class JwtTokenProvider {
         }
         return null;
     }
-
 }
