@@ -167,6 +167,40 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
+                    <!-- Fail the build if coverage regresses. Thresholds sit below the current
+                         ~97% line / ~95% branch so genuine drops fail while normal churn passes.
+                         Generated mappers and the Spring bootstrap class carry unavoidable
+                         uncovered lines, so they're excluded to keep the gate about real logic. -->
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/*MapperImpl.*</exclude>
+                                <exclude>**/TaskManagerApplication.*</exclude>
+                            </excludes>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.90</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.85</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <!-- Style gate. `spotless:check` runs in the build (fail-fast at compile);
