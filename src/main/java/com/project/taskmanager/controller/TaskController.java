@@ -2,7 +2,6 @@ package com.project.taskmanager.controller;
 
 import com.project.taskmanager.dto.TaskDTO;
 import com.project.taskmanager.dto.TaskResponseDTO;
-import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.mapper.TaskMapper;
