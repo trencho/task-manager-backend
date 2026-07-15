@@ -1,5 +1,7 @@
 package com.project.taskmanager.controller;
 
+import jakarta.validation.Valid;
+
 import com.project.taskmanager.dto.RefreshTokenRequestDTO;
 import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.dto.UserLoginDTO;
@@ -8,7 +10,6 @@ import com.project.taskmanager.mapper.UserMapper;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.UserService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,8 +51,8 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody final UserLoginDTO userLoginDTO) {
         try {
             final var username = userLoginDTO.username();
-            final var authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(username, userLoginDTO.password()));
+            final var authentication = authenticationManager
+                    .authenticate(new UsernamePasswordAuthenticationToken(username, userLoginDTO.password()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 

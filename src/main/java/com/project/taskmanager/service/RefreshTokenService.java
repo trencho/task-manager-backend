@@ -1,8 +1,9 @@
 package com.project.taskmanager.service;
 
+import java.util.Optional;
+
 import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.entity.RefreshToken;
-import java.util.Optional;
 
 public interface RefreshTokenService {
 

@@ -1,8 +1,9 @@
 package com.project.taskmanager.dto;
 
+import java.time.LocalDate;
+
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
-import java.time.LocalDate;
 
 /**
  * The read side of a task. Carries {@code id} — the client edits and deletes by it — and
@@ -11,5 +12,6 @@ import java.time.LocalDate;
  * <p>
  * {@link TaskDTO} remains the write side, where the bean-validation constraints live.
  */
-public record TaskResponseDTO(
-        String id, String title, String description, LocalDate dueDate, TaskStatus status, Priority priority) {}
+public record TaskResponseDTO(String id, String title, String description, LocalDate dueDate, TaskStatus status,
+        Priority priority) {
+}

@@ -9,7 +9,7 @@
 ################################################################################
 
 # Create a stage for resolving and downloading dependencies.
-FROM eclipse-temurin:21-jdk-jammy@sha256:9d8dcf999b0bce2453e913823595a5ff2a4e8e9e5d5241b45280d0ff069818ec AS deps
+FROM eclipse-temurin:25-jdk-jammy@sha256:0348e7b24ad4479cf35927b750671bb4b78465c303003b08536f6f2fa6f180cd AS deps
 
 WORKDIR /build
 
@@ -62,11 +62,11 @@ RUN java -Djarmode=layertools -jar target/app.jar extract --destination target/e
 # from the install stage.
 #
 # The example below uses eclipse-temurin's JRE image as the foundation for running the app.
-# Both stages pin the digest as well as the tag: a bare "21-jre-jammy" resolves to whatever
+# Both stages pin the digest as well as the tag: a bare "25-jre-jammy" resolves to whatever
 # that tag points at on the day of the build, so two builds of the same commit can differ.
 # The tag is kept alongside the digest only so a human can read which image this is.
 # Dependabot proposes digest bumps, which is how these stay current.
-FROM eclipse-temurin:21-jre-jammy@sha256:d63bd8d9b171999cbed8576f2c76e874dd4856791a358536e5c4d407e77edc13 AS final
+FROM eclipse-temurin:25-jre-jammy@sha256:b8ba5fca9d88b6ecc3a46c8e75b744f84aca9a9d08587901b5ab480baf641ab5 AS final
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/

@@ -1,17 +1,13 @@
 package com.project.taskmanager;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import java.util.Set;
+import jakarta.servlet.FilterChain;
 
 import com.project.taskmanager.entity.User;
 import com.project.taskmanager.security.CustomUserDetails;
 import com.project.taskmanager.security.CustomUserDetailsService;
 import com.project.taskmanager.security.JwtAuthenticationFilter;
 import com.project.taskmanager.security.JwtTokenProvider;
-import jakarta.servlet.FilterChain;
-import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterUnitTest {

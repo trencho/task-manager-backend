@@ -21,13 +21,11 @@ public class MongoTestContainerConfig {
 
     @Bean
     public MongoTemplate mongoTemplate(final MongoDBContainer mongoDBContainer) {
-        final var mongoUri = String.format(
-                "mongodb://%s:%d/task-manager", mongoDBContainer.getHost(), mongoDBContainer.getMappedPort(27017));
+        final var mongoUri = String.format("mongodb://%s:%d/task-manager", mongoDBContainer.getHost(),
+                mongoDBContainer.getMappedPort(27017));
 
         final var connectionString = new ConnectionString(mongoUri);
-        final var mongoClientSettings = MongoClientSettings.builder()
-                .applyConnectionString(connectionString)
-                .build();
+        final var mongoClientSettings = MongoClientSettings.builder().applyConnectionString(connectionString).build();
 
         return new MongoTemplate(
                 new SimpleMongoClientDatabaseFactory(MongoClients.create(mongoClientSettings), "task-manager"));

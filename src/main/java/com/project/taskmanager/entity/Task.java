@@ -1,8 +1,9 @@
 package com.project.taskmanager.entity;
 
+import java.time.LocalDate;
+
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
-import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,11 +28,7 @@ public class Task {
     private Priority priority;
     private String username;
 
-    public Task(
-            final String title,
-            final String description,
-            final LocalDate dueDate,
-            final TaskStatus status,
+    public Task(final String title, final String description, final LocalDate dueDate, final TaskStatus status,
             final String username) {
         this.title = title;
         this.description = description;

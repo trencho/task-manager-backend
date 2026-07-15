@@ -1,17 +1,18 @@
 package com.project.taskmanager;
 
+import java.time.Instant;
+import jakarta.servlet.http.HttpServletRequest;
+
+import com.project.taskmanager.security.JwtTokenProvider;
+import io.jsonwebtoken.security.WeakKeyException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
-import com.project.taskmanager.security.JwtTokenProvider;
-import io.jsonwebtoken.security.WeakKeyException;
-import jakarta.servlet.http.HttpServletRequest;
-import java.time.Instant;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class JwtTokenProviderUnitTest {
 
@@ -61,8 +62,7 @@ class JwtTokenProviderUnitTest {
         // Every bit of the first character is significant.
         final var signatureStart = token.lastIndexOf('.') + 1;
         final var firstChar = token.charAt(signatureStart);
-        final var tampered = token.substring(0, signatureStart)
-                + (firstChar == 'A' ? 'B' : 'A')
+        final var tampered = token.substring(0, signatureStart) + (firstChar == 'A' ? 'B' : 'A')
                 + token.substring(signatureStart + 1);
 
         assertThat(tampered).isNotEqualTo(token);
@@ -74,8 +74,8 @@ class JwtTokenProviderUnitTest {
         final var token = tokenProvider.generateAccessToken(USERNAME);
 
         final var otherProvider = new JwtTokenProvider();
-        ReflectionTestUtils.setField(
-                otherProvider, "jwtSecret", "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100");
+        ReflectionTestUtils.setField(otherProvider, "jwtSecret",
+                "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100");
         ReflectionTestUtils.setField(otherProvider, "accessTokenExpiration", 3_600_000);
         ReflectionTestUtils.setField(otherProvider, "refreshTokenExpiration", 86_400_000L);
 

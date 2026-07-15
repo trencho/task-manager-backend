@@ -1,19 +1,5 @@
 package com.project.taskmanager;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.taskmanager.dto.RefreshTokenRequestDTO;
 import com.project.taskmanager.dto.TokenResponseDTO;
@@ -37,6 +23,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -74,9 +74,7 @@ class AuthControllerIntegrationTest {
     void shouldRevokeTheRefreshTokenOnLogout() throws Exception {
         final var request = new RefreshTokenRequestDTO("refresh-token");
 
-        mockMvc.perform(post("/api/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(request)))
+        mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON).content(asJsonString(request)))
                 .andExpect(status().isNoContent());
 
         verify(refreshTokenService).deleteByToken("refresh-token");
@@ -88,10 +86,8 @@ class AuthControllerIntegrationTest {
      */
     @Test
     void shouldTreatLogoutOfAnUnknownTokenAsSuccess() throws Exception {
-        mockMvc.perform(post("/api/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(new RefreshTokenRequestDTO("never-issued"))))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(new RefreshTokenRequestDTO("never-issued")))).andExpect(status().isNoContent());
     }
 
     /**
@@ -116,9 +112,7 @@ class AuthControllerIntegrationTest {
 
     @Test
     void shouldRejectLogoutWithoutARefreshToken() throws Exception {
-        mockMvc.perform(post("/api/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+        mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
 
         verify(refreshTokenService, never()).deleteByToken(any());
@@ -130,10 +124,8 @@ class AuthControllerIntegrationTest {
 
         doNothing().when(userService).registerUser(any(User.class));
 
-        mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(userRegistrationDTO)))
-                .andExpect(status().isOk())
+        mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(userRegistrationDTO))).andExpect(status().isOk())
                 .andExpect(content().string("User registered successfully!"));
 
         // Drive the real UserMapper: assert it mapped every field of the DTO onto the entity
@@ -149,14 +141,10 @@ class AuthControllerIntegrationTest {
     void shouldReturnBadRequestOnFailedRegistration() throws Exception {
         final var userRegistrationDTO = new UserRegistrationDTO("username", "email@example.com", "password");
 
-        doThrow(new IllegalArgumentException("User already exists"))
-                .when(userService)
-                .registerUser(any(User.class));
+        doThrow(new IllegalArgumentException("User already exists")).when(userService).registerUser(any(User.class));
 
-        mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(userRegistrationDTO)))
-                .andExpect(status().isBadRequest())
+        mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(userRegistrationDTO))).andExpect(status().isBadRequest())
                 .andExpect(content().string("User already exists"));
     }
 
@@ -174,11 +162,9 @@ class AuthControllerIntegrationTest {
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(refreshToken);
         when(refreshToken.getToken()).thenReturn(refreshTokenString);
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(userLoginDTO)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value(accessTokenString))
+        mockMvc.perform(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(asJsonString(userLoginDTO)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value(accessTokenString))
                 .andExpect(jsonPath("$.refreshToken").value(refreshTokenString));
     }
 
@@ -189,11 +175,9 @@ class AuthControllerIntegrationTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Invalid credentials"));
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(userLoginDTO)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().string("Invalid credentials"));
+        mockMvc.perform(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(asJsonString(userLoginDTO)))
+                .andExpect(status().isUnauthorized()).andExpect(content().string("Invalid credentials"));
     }
 
     @Test
@@ -205,10 +189,8 @@ class AuthControllerIntegrationTest {
         when(refreshTokenService.refreshAccessToken(refreshToken))
                 .thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
 
-        mockMvc.perform(post("/api/auth/refresh-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(refreshTokenRequest)))
-                .andExpect(status().isOk())
+        mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(refreshTokenRequest))).andExpect(status().isOk())
                 // Rotation: the response carries a new refresh token too, and it is not the
                 // one the caller presented.
                 .andExpect(jsonPath("$.accessToken").value(newAccessToken))
@@ -223,9 +205,7 @@ class AuthControllerIntegrationTest {
         when(refreshTokenService.refreshAccessToken(refreshToken))
                 .thenThrow(new RuntimeException("Refresh token not found"));
 
-        mockMvc.perform(post("/api/auth/refresh-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(refreshTokenRequest)))
-                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(refreshTokenRequest))).andExpect(status().isUnauthorized());
     }
 }

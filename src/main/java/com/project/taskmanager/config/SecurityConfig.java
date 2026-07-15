@@ -1,10 +1,11 @@
 package com.project.taskmanager.config;
 
+import java.time.Duration;
+
 import com.project.taskmanager.security.CustomUserDetailsService;
 import com.project.taskmanager.security.JwtAuthenticationFilter;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.security.RateLimitFilter;
-import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -51,41 +52,32 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
-        return http.csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(requests -> requests
-                        // Ahead of the /api/auth/** permitAll below: first match wins. Revoking
-                        // every session is authenticated, because no token is presented to
-                        // establish authority -- unlike /logout, where possession of the refresh
-                        // token is the authority to revoke it.
-                        .requestMatchers(HttpMethod.POST, "/api/auth/logout-all")
-                        .authenticated()
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                // Both forms: "/v3/api-docs/**" does not match the bare
-                                // "/v3/api-docs", which is the path springdoc actually serves.
-                                "/v3/api-docs",
-                                "/v3/api-docs/**",
-                                "/webjars/**")
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated())
+        return http.csrf(AbstractHttpConfigurer::disable).authorizeHttpRequests(requests -> requests
+                // Ahead of the /api/auth/** permitAll below: first match wins. Revoking
+                // every session is authenticated, because no token is presented to
+                // establish authority -- unlike /logout, where possession of the refresh
+                // token is the authority to revoke it.
+                .requestMatchers(HttpMethod.POST, "/api/auth/logout-all").authenticated()
+                .requestMatchers("/api/auth/**", "/swagger-ui/**", "/swagger-ui.html",
+                        // Both forms: "/v3/api-docs/**" does not match the bare
+                        // "/v3/api-docs", which is the path springdoc actually serves.
+                        "/v3/api-docs", "/v3/api-docs/**", "/webjars/**")
+                .permitAll().anyRequest().authenticated())
                 // No .logout(...) customizer. Spring Security's LogoutFilter would intercept
                 // POST /api/auth/logout before it reached AuthController, answering 302 to a
                 // login URL. Its work -- invalidating an HTTP session, clearing JSESSIONID --
                 // is meaningless here: the session policy is STATELESS and auth is a bearer
                 // token. Revoking the refresh token is the only thing logout can actually do,
                 // and AuthController does it.
-                .exceptionHandling(exceptionHandlingCustomizer ->
-                        exceptionHandlingCustomizer.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .exceptionHandling(exceptionHandlingCustomizer -> exceptionHandlingCustomizer
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 // Ahead of the JWT filter: throttling a credential-guessing flood must not depend
                 // on any work done for a token the caller does not have.
                 .addFilterBefore(rateLimitFilter(), JwtAuthenticationFilter.class)
-                .sessionManagement(sessionManagementCustomizer ->
-                        sessionManagementCustomizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sessionManagementCustomizer -> sessionManagementCustomizer
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .build();
     }
 
@@ -96,8 +88,8 @@ public class SecurityConfig {
 
     @Bean
     public RateLimitFilter rateLimitFilter() {
-        return new RateLimitFilter(
-                rateLimitCapacity, rateLimitRefillPeriod, rateLimitTrustForwardedFor, rateLimitMaxBuckets);
+        return new RateLimitFilter(rateLimitCapacity, rateLimitRefillPeriod, rateLimitTrustForwardedFor,
+                rateLimitMaxBuckets);
     }
 
     @Bean

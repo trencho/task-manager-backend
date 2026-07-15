@@ -1,9 +1,10 @@
 package com.project.taskmanager.repository;
 
+import java.time.LocalDate;
+
 import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
-import java.time.LocalDate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -20,6 +21,6 @@ public interface TaskRepositoryCustom {
      * @param q         matched case-insensitively against title OR description
      * @param dueBefore exclusive upper bound on {@code dueDate}
      */
-    Page<Task> search(
-            String username, TaskStatus status, Priority priority, String q, LocalDate dueBefore, Pageable pageable);
+    Page<Task> search(String username, TaskStatus status, Priority priority, String q, LocalDate dueBefore,
+            Pageable pageable);
 }

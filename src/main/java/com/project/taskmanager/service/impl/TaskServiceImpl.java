@@ -1,12 +1,13 @@
 package com.project.taskmanager.service.impl;
 
+import java.time.LocalDate;
+
 import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.exception.TaskNotFoundException;
 import com.project.taskmanager.repository.TaskRepository;
 import com.project.taskmanager.service.TaskService;
-import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,13 +23,8 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
 
     @Override
-    public Page<Task> getAllTasks(
-            final String username,
-            final TaskStatus status,
-            final Priority priority,
-            final String q,
-            final LocalDate dueBefore,
-            final Pageable pageable) {
+    public Page<Task> getAllTasks(final String username, final TaskStatus status, final Priority priority,
+            final String q, final LocalDate dueBefore, final Pageable pageable) {
         return taskRepository.search(username, status, priority, q, dueBefore, pageable);
     }
 
@@ -39,8 +35,8 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public Task getTaskById(final String username, final String id) {
-        final var task =
-                taskRepository.findById(id).orElseThrow(() -> new TaskNotFoundException(TASK_NOT_FOUND_WITH_ID + id));
+        final var task = taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException(TASK_NOT_FOUND_WITH_ID + id));
         if (task.getUsername().equals(username)) {
             return task;
         }
@@ -49,8 +45,8 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public Task updateTask(final String username, final String id, final Task task) {
-        final var existingTask =
-                taskRepository.findById(id).orElseThrow(() -> new TaskNotFoundException(TASK_NOT_FOUND_WITH_ID + id));
+        final var existingTask = taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException(TASK_NOT_FOUND_WITH_ID + id));
 
         if (existingTask.getUsername().equals(username)) {
             existingTask.setTitle(task.getTitle());
@@ -72,8 +68,8 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public void deleteTask(final String username, final String id) {
-        final var existingTask =
-                taskRepository.findById(id).orElseThrow(() -> new TaskNotFoundException(TASK_NOT_FOUND_WITH_ID + id));
+        final var existingTask = taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException(TASK_NOT_FOUND_WITH_ID + id));
         if (existingTask.getUsername().equals(username)) {
             taskRepository.deleteById(id);
             return;

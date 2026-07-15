@@ -1,11 +1,12 @@
 package com.project.taskmanager;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.Set;
 
 import com.project.taskmanager.entity.User;
 import com.project.taskmanager.security.CustomUserDetails;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CustomUserDetailsUnitTest {
 

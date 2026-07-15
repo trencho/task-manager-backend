@@ -1,20 +1,21 @@
 package com.project.taskmanager;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.when;
+import java.util.Optional;
+import java.util.Set;
 
 import com.project.taskmanager.entity.User;
 import com.project.taskmanager.repository.UserRepository;
 import com.project.taskmanager.security.CustomUserDetailsService;
-import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceUnitTest {
@@ -49,8 +50,8 @@ class CustomUserDetailsServiceUnitTest {
     void shouldThrowWhenTheUserDoesNotExist() {
         when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
 
-        final var thrown = assertThrows(
-                UsernameNotFoundException.class, () -> customUserDetailsService.loadUserByUsername(USERNAME));
+        final var thrown = assertThrows(UsernameNotFoundException.class,
+                () -> customUserDetailsService.loadUserByUsername(USERNAME));
 
         assertThat(thrown.getMessage()).contains(USERNAME);
     }

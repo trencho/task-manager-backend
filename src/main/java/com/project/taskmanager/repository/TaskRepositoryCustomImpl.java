@@ -1,11 +1,12 @@
 package com.project.taskmanager.repository;
 
-import com.project.taskmanager.entity.Task;
-import com.project.taskmanager.enums.Priority;
-import com.project.taskmanager.enums.TaskStatus;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
+
+import com.project.taskmanager.entity.Task;
+import com.project.taskmanager.enums.Priority;
+import com.project.taskmanager.enums.TaskStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,13 +26,8 @@ public class TaskRepositoryCustomImpl implements TaskRepositoryCustom {
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public Page<Task> search(
-            final String username,
-            final TaskStatus status,
-            final Priority priority,
-            final String q,
-            final LocalDate dueBefore,
-            final Pageable pageable) {
+    public Page<Task> search(final String username, final TaskStatus status, final Priority priority, final String q,
+            final LocalDate dueBefore, final Pageable pageable) {
         final var criteria = new ArrayList<Criteria>();
 
         // Always scoped to the owner. Never make this conditional.
@@ -50,10 +46,8 @@ public class TaskRepositoryCustomImpl implements TaskRepositoryCustom {
             // Pattern.quote: `q` is user input going into a regex. Unquoted, `.*` would match
             // every task and a pathological pattern would hang the server (ReDoS).
             final var quoted = Pattern.quote(q);
-            criteria.add(new Criteria()
-                    .orOperator(
-                            Criteria.where("title").regex(quoted, "i"),
-                            Criteria.where("description").regex(quoted, "i")));
+            criteria.add(new Criteria().orOperator(Criteria.where("title").regex(quoted, "i"),
+                    Criteria.where("description").regex(quoted, "i")));
         }
 
         // andOperator, not a chain of .and(...): a chained .and() after the $or above would

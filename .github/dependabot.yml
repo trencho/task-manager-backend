@@ -42,9 +42,10 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # The pom targets Java 21 and the build only works on 21: since JDK 23, javac stops
-      # running annotation processors found on the classpath, so Lombok and MapStruct
-      # generate nothing. Keep both stages on the 21 line.
+      # Stay on the current Java LTS (25). The build is no longer JDK-version-locked — Lombok and
+      # MapStruct are declared via annotationProcessorPaths, so javac 23+ runs them — so this pin is
+      # purely an LTS-cadence choice: skip the 6-month non-LTS majors (26, 27, 28) and move
+      # deliberately at the next LTS.
       - dependency-name: "eclipse-temurin"
         update-types: [version-update:semver-major]
       # Stay on MongoDB's 8.0 line; 8.1+ are rapid releases.

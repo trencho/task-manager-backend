@@ -1,14 +1,6 @@
 package com.project.taskmanager;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.time.LocalDate;
 
 import com.project.taskmanager.config.MongoTestContainerConfig;
 import com.project.taskmanager.entity.Task;
@@ -18,7 +10,6 @@ import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.repository.TaskRepository;
 import com.project.taskmanager.repository.UserRepository;
 import com.project.taskmanager.security.CustomUserDetails;
-import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,16 +23,24 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 @AutoConfigureMockMvc
 @ContextConfiguration(classes = MongoTestContainerConfig.class)
 @SpringBootTest
 class TaskControllerIntegrationTest {
 
     private static final String BASE_URL = "/api/tasks";
-    private static final String TASK_JSON =
-            "{\"title\": \"New Task Title\", \"description\": \"New Task Description\"}";
-    private static final String UPDATED_TASK_JSON =
-            "{\"title\": \"Updated Task Title\", \"description\": \"Updated Task Description\"}";
+    private static final String TASK_JSON = "{\"title\": \"New Task Title\", \"description\": \"New Task Description\"}";
+    private static final String UPDATED_TASK_JSON = "{\"title\": \"Updated Task Title\", \"description\": \"Updated Task Description\"}";
     private static final String USERNAME = "username";
 
     @Autowired
@@ -91,20 +90,20 @@ class TaskControllerIntegrationTest {
      * task must never appear in any filtered result — scoping is not a filter, it is an invariant.
      */
     private void seedForSearch() {
-        final var groceries =
-                new Task("Buy groceries", "Milk and BREAD", LocalDate.now().plusDays(2), TaskStatus.PENDING, USERNAME);
+        final var groceries = new Task("Buy groceries", "Milk and BREAD", LocalDate.now().plusDays(2),
+                TaskStatus.PENDING, USERNAME);
         groceries.setPriority(Priority.LOW);
         taskRepository.save(groceries);
 
         // MEDIUM, not HIGH: the task seeded in setUp() is already HIGH, so filtering on HIGH here
         // would match two tasks and the assertion would say nothing about the filter.
-        final var report = new Task(
-                "Write report", "Quarterly numbers", LocalDate.now().plusDays(30), TaskStatus.COMPLETED, USERNAME);
+        final var report = new Task("Write report", "Quarterly numbers", LocalDate.now().plusDays(30),
+                TaskStatus.COMPLETED, USERNAME);
         report.setPriority(Priority.MEDIUM);
         taskRepository.save(report);
 
-        final var foreign =
-                new Task("Buy groceries", "Someone else's list", LocalDate.now(), TaskStatus.PENDING, "otheruser");
+        final var foreign = new Task("Buy groceries", "Someone else's list", LocalDate.now(), TaskStatus.PENDING,
+                "otheruser");
         foreign.setPriority(Priority.LOW);
         taskRepository.save(foreign);
     }
@@ -114,8 +113,7 @@ class TaskControllerIntegrationTest {
     void shouldFilterByStatus() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL).param("status", "COMPLETED"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("status", "COMPLETED")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Write report"));
     }
@@ -126,8 +124,7 @@ class TaskControllerIntegrationTest {
         seedForSearch();
 
         // MEDIUM matches only "Write report": setUp()'s task is HIGH, groceries is LOW.
-        mockMvc.perform(get(BASE_URL).param("priority", "MEDIUM"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("priority", "MEDIUM")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Write report"));
     }
@@ -137,8 +134,7 @@ class TaskControllerIntegrationTest {
     void shouldSearchTheTitleCaseInsensitively() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL).param("q", "GROCERIES"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("q", "GROCERIES")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Buy groceries"));
     }
@@ -148,8 +144,7 @@ class TaskControllerIntegrationTest {
     void shouldSearchTheDescriptionCaseInsensitively() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL).param("q", "bread"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("q", "bread")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Buy groceries"));
     }
@@ -163,8 +158,7 @@ class TaskControllerIntegrationTest {
     void shouldTreatRegexMetacharactersInTheQueryAsLiterals() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL).param("q", ".*"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("q", ".*")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0));
     }
 
@@ -174,10 +168,8 @@ class TaskControllerIntegrationTest {
         seedForSearch();
 
         // The seeded task is due today; groceries in 2 days; the report in 30.
-        mockMvc.perform(get(BASE_URL)
-                        .param("dueBefore", LocalDate.now().plusDays(3).toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(2));
+        mockMvc.perform(get(BASE_URL).param("dueBefore", LocalDate.now().plusDays(3).toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(2));
     }
 
     @Test
@@ -185,12 +177,8 @@ class TaskControllerIntegrationTest {
     void shouldCombineFilters() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL)
-                        .param("q", "groceries")
-                        .param("priority", "LOW")
-                        .param("status", "PENDING"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
+        mockMvc.perform(get(BASE_URL).param("q", "groceries").param("priority", "LOW").param("status", "PENDING"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Buy groceries"));
     }
 
@@ -202,8 +190,7 @@ class TaskControllerIntegrationTest {
     void shouldNeverReturnAnotherUsersTaskHoweverItIsFiltered() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL).param("q", "groceries"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("q", "groceries")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].description").value("Milk and BREAD"));
     }
@@ -213,8 +200,7 @@ class TaskControllerIntegrationTest {
     void shouldSortByDueDate() throws Exception {
         seedForSearch();
 
-        mockMvc.perform(get(BASE_URL).param("sort", "dueDate,desc"))
-                .andExpect(status().isOk())
+        mockMvc.perform(get(BASE_URL).param("sort", "dueDate,desc")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].title").value("Write report"));
     }
 
@@ -225,8 +211,7 @@ class TaskControllerIntegrationTest {
         taskRepository.save(task1);
 
         mockMvc.perform(get(BASE_URL).param("page", "0").param("size", "10").contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Initial Task Title"))
                 .andExpect(jsonPath("$.content[0].description").value("Initial Task Description"))
                 // The list endpoint used to serialise the Task entity, so every item carried the
@@ -234,32 +219,24 @@ class TaskControllerIntegrationTest {
                 // business knowing the owner -- it can only ever see its own tasks.
                 .andExpect(jsonPath("$.content[0].id").exists())
                 .andExpect(jsonPath("$.content[0].username").doesNotExist())
-                .andExpect(jsonPath("$.page.totalElements").value(1))
-                .andExpect(jsonPath("$.page.totalPages").value(1))
-                .andExpect(jsonPath("$.page.size").value(10))
-                .andExpect(jsonPath("$.page.number").value(0));
+                .andExpect(jsonPath("$.page.totalElements").value(1)).andExpect(jsonPath("$.page.totalPages").value(1))
+                .andExpect(jsonPath("$.page.size").value(10)).andExpect(jsonPath("$.page.number").value(0));
     }
 
     @Test
     @WithMockUser(username = USERNAME)
     void testCreateTask() throws Exception {
         mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON).content(TASK_JSON))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.title").value("New Task Title"))
-                .andExpect(jsonPath("$.description").value("New Task Description"))
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.username").doesNotExist())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.title").value("New Task Title"))
+                .andExpect(jsonPath("$.description").value("New Task Description")).andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.username").doesNotExist()).andReturn().getResponse().getContentAsString();
     }
 
     @Test
     @WithMockUser(username = USERNAME)
     void shouldDefaultToPendingWhenNoStatusIsSupplied() throws Exception {
         mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON).content(TASK_JSON))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     /**
@@ -269,11 +246,9 @@ class TaskControllerIntegrationTest {
     @Test
     @WithMockUser(username = USERNAME)
     void shouldHonourTheStatusSuppliedOnCreate() throws Exception {
-        mockMvc.perform(post(BASE_URL)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\": \"Started Task\", \"description\": \"d\", \"status\": \"IN_PROGRESS\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+        mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\": \"Started Task\", \"description\": \"d\", \"status\": \"IN_PROGRESS\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("IN_PROGRESS"));
     }
 
     /**
@@ -283,10 +258,8 @@ class TaskControllerIntegrationTest {
     @Test
     @WithMockUser(username = USERNAME)
     void shouldPreserveTheExistingStatusWhenUpdateOmitsIt() throws Exception {
-        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(UPDATED_TASK_JSON))
-                .andExpect(status().isOk())
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content(UPDATED_TASK_JSON)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(task.getStatus().name()));
     }
 
@@ -294,18 +267,15 @@ class TaskControllerIntegrationTest {
     @WithMockUser(username = USERNAME)
     void shouldDefaultToMediumWhenNoPriorityIsSupplied() throws Exception {
         mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON).content(TASK_JSON))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.priority").value("MEDIUM"));
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.priority").value("MEDIUM"));
     }
 
     @Test
     @WithMockUser(username = USERNAME)
     void shouldHonourThePrioritySuppliedOnCreate() throws Exception {
-        mockMvc.perform(post(BASE_URL)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\": \"Urgent Task\", \"description\": \"d\", \"priority\": \"HIGH\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.priority").value("HIGH"));
+        mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\": \"Urgent Task\", \"description\": \"d\", \"priority\": \"HIGH\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.priority").value("HIGH"));
     }
 
     /**
@@ -314,41 +284,32 @@ class TaskControllerIntegrationTest {
     @Test
     @WithMockUser(username = USERNAME)
     void shouldPreserveTheExistingPriorityWhenUpdateOmitsIt() throws Exception {
-        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(UPDATED_TASK_JSON))
-                .andExpect(status().isOk())
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content(UPDATED_TASK_JSON)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.priority").value(task.getPriority().name()));
     }
 
     @Test
     @WithMockUser(username = USERNAME)
     void shouldApplyANewPriorityOnUpdate() throws Exception {
-        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\": \"Updated Task Title\", \"description\": \"d\", \"priority\": \"LOW\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.priority").value("LOW"));
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\": \"Updated Task Title\", \"description\": \"d\", \"priority\": \"LOW\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.priority").value("LOW"));
     }
 
     @Test
     @WithMockUser(username = USERNAME)
     void shouldApplyANewStatusOnUpdate() throws Exception {
-        mockMvc.perform(
-                        put(BASE_URL + "/{id}", task.getId())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        "{\"title\": \"Updated Task Title\", \"description\": \"d\", \"status\": \"COMPLETED\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\": \"Updated Task Title\", \"description\": \"d\", \"status\": \"COMPLETED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 
     @Test
     @WithMockUser(username = USERNAME)
     void testGetTaskSuccessful() throws Exception {
         mockMvc.perform(get(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value(task.getTitle()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value(task.getTitle()))
                 .andExpect(jsonPath("$.description").value(task.getDescription()));
     }
 
@@ -362,10 +323,8 @@ class TaskControllerIntegrationTest {
     @Test
     @WithMockUser(username = USERNAME)
     void testUpdateTaskSuccessful() throws Exception {
-        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(UPDATED_TASK_JSON))
-                .andExpect(status().isOk())
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content(UPDATED_TASK_JSON)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Updated Task Title"))
                 .andExpect(jsonPath("$.description").value("Updated Task Description"));
     }
@@ -373,20 +332,15 @@ class TaskControllerIntegrationTest {
     @Test
     @WithMockUser(username = USERNAME)
     void testUpdateTaskFailedMissingTask() throws Exception {
-        mockMvc.perform(put(BASE_URL + "/100")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(UPDATED_TASK_JSON))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("Task not found with id: 100"));
+        mockMvc.perform(put(BASE_URL + "/100").contentType(MediaType.APPLICATION_JSON).content(UPDATED_TASK_JSON))
+                .andExpect(status().isNotFound()).andExpect(content().string("Task not found with id: 100"));
     }
 
     @Test
     @WithMockUser(username = "username1")
     void testUpdateTaskFailedIncorrectUser() throws Exception {
-        mockMvc.perform(put(BASE_URL + "/{id}", task.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(UPDATED_TASK_JSON))
-                .andExpect(status().isNotFound())
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content(UPDATED_TASK_JSON)).andExpect(status().isNotFound())
                 .andExpect(content().string("Task not found for user: username1"));
     }
 
@@ -401,15 +355,13 @@ class TaskControllerIntegrationTest {
     @WithMockUser(username = USERNAME)
     void testDeleteTaskFailedMissingTask() throws Exception {
         mockMvc.perform(delete(BASE_URL + "/100").contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("Task not found with id: 100"));
+                .andExpect(status().isNotFound()).andExpect(content().string("Task not found with id: 100"));
     }
 
     @Test
     @WithMockUser(username = "username1")
     void testDeleteTaskFailedIncorrectUser() throws Exception {
         mockMvc.perform(delete(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("Task not found for user: username1"));
+                .andExpect(status().isNotFound()).andExpect(content().string("Task not found for user: username1"));
     }
 }

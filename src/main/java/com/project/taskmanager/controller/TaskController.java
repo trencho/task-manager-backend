@@ -1,15 +1,16 @@
 package com.project.taskmanager.controller;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.time.LocalDate;
+import jakarta.validation.Valid;
+
 import com.project.taskmanager.dto.TaskDTO;
 import com.project.taskmanager.dto.TaskResponseDTO;
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.mapper.TaskMapper;
 import com.project.taskmanager.service.TaskService;
-import jakarta.validation.Valid;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -42,21 +43,18 @@ public class TaskController {
     public ResponseEntity<Page<TaskResponseDTO>> getAllTasks(
             @AuthenticationPrincipal(expression = "username") final String username,
             @RequestParam(required = false) final TaskStatus status,
-            @RequestParam(required = false) final Priority priority,
-            @RequestParam(required = false) final String q,
+            @RequestParam(required = false) final Priority priority, @RequestParam(required = false) final String q,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dueBefore,
             final Pageable pageable) {
         // Page.map preserves the pageable metadata, so the `page` block of the JSON is unchanged.
-        return ResponseEntity.ok(taskService
-                .getAllTasks(username, status, priority, q, dueBefore, pageable)
+        return ResponseEntity.ok(taskService.getAllTasks(username, status, priority, q, dueBefore, pageable)
                 .map(taskMapper::toResponse));
     }
 
     @PostMapping
     public ResponseEntity<TaskResponseDTO> createTask(
             @AuthenticationPrincipal(expression = "username") final String username,
-            @Valid @RequestBody final TaskDTO taskDTO)
-            throws URISyntaxException {
+            @Valid @RequestBody final TaskDTO taskDTO) throws URISyntaxException {
         final var task = taskMapper.toEntity(taskDTO);
         task.setUsername(username);
         // A client may create a task in any state; PENDING is only the default. This used to
@@ -84,16 +82,14 @@ public class TaskController {
 
     @PutMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> updateTask(
-            @AuthenticationPrincipal(expression = "username") final String username,
-            @PathVariable final String taskId,
+            @AuthenticationPrincipal(expression = "username") final String username, @PathVariable final String taskId,
             @Valid @RequestBody final TaskDTO taskDTO) {
         final var task = taskService.updateTask(username, taskId, taskMapper.toEntity(taskDTO));
         return ResponseEntity.ok(taskMapper.toResponse(task));
     }
 
     @DeleteMapping("/{taskId}")
-    public ResponseEntity<Void> deleteTask(
-            @AuthenticationPrincipal(expression = "username") final String username,
+    public ResponseEntity<Void> deleteTask(@AuthenticationPrincipal(expression = "username") final String username,
             @PathVariable final String taskId) {
         taskService.deleteTask(username, taskId);
         return ResponseEntity.noContent().build();

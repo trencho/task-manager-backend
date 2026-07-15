@@ -1,8 +1,9 @@
 package com.project.taskmanager.security;
 
-import com.project.taskmanager.entity.User;
 import java.util.Collection;
 import java.util.stream.Collectors;
+
+import com.project.taskmanager.entity.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -1,11 +1,5 @@
 package com.project.taskmanager.security;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
@@ -13,6 +7,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -42,12 +43,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
      */
     private final Map<String, Bucket> buckets;
 
-    public RateLimitFilter(
-            final int capacity, final Duration refillPeriod, final boolean trustForwardedFor, final int maxBuckets) {
+    public RateLimitFilter(final int capacity, final Duration refillPeriod, final boolean trustForwardedFor,
+            final int maxBuckets) {
         this.capacity = capacity;
         this.refillPeriod = refillPeriod;
         this.trustForwardedFor = trustForwardedFor;
         this.buckets = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+
             @Override
             protected boolean removeEldestEntry(final Map.Entry<String, Bucket> eldest) {
                 return size() > maxBuckets;
@@ -61,9 +63,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            final HttpServletRequest request, final HttpServletResponse response, final FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(final HttpServletRequest request, final HttpServletResponse response,
+            final FilterChain filterChain) throws ServletException, IOException {
         // Keyed on path as well as client: exhausting the login allowance must not also lock the
         // caller out of signing up.
         final var key = request.getRequestURI() + '|' + clientKey(request);
@@ -75,8 +76,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         // Round up: a sub-second wait must not be advertised as "retry immediately".
-        final var retryAfterSeconds =
-                Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill() + 999_999_999L));
+        final var retryAfterSeconds = Math.max(1,
+                TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill() + 999_999_999L));
 
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
@@ -91,10 +92,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // caller sustain exactly the limit forever -- fine for an API quota, pointless for a
         // brute-force guard.
         return Bucket.builder()
-                .addLimit(Bandwidth.builder()
-                        .capacity(capacity)
-                        .refillIntervally(capacity, refillPeriod)
-                        .build())
+                .addLimit(Bandwidth.builder().capacity(capacity).refillIntervally(capacity, refillPeriod).build())
                 .build();
     }
 

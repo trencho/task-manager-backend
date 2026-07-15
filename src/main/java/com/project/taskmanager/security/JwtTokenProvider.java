@@ -1,15 +1,16 @@
 package com.project.taskmanager.security;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.UUID;
+import jakarta.servlet.http.HttpServletRequest;
+import javax.crypto.SecretKey;
+
 import com.project.taskmanager.entity.RefreshToken;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import jakarta.servlet.http.HttpServletRequest;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.UUID;
-import javax.crypto.SecretKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -55,11 +56,8 @@ public class JwtTokenProvider {
         // "new" token equalled the old one) and made two logins in one second collide.
         final var tokenId = UUID.randomUUID().toString();
 
-        return RefreshToken.builder()
-                .token(buildToken(username, now, expiration, tokenId))
-                .username(username)
-                .expiryDate(expiration.toInstant())
-                .build();
+        return RefreshToken.builder().token(buildToken(username, now, expiration, tokenId)).username(username)
+                .expiryDate(expiration.toInstant()).build();
     }
 
     private String buildToken(final String username, final Date issuedAt, final Date expiration, final String tokenId) {
@@ -89,11 +87,7 @@ public class JwtTokenProvider {
     }
 
     private Claims parseClaims(final String token) {
-        return Jwts.parser()
-                .verifyWith(signingKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        return Jwts.parser().verifyWith(signingKey()).build().parseSignedClaims(token).getPayload();
     }
 
     public String resolveToken(final HttpServletRequest request) {

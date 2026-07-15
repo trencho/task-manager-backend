@@ -9,7 +9,7 @@ Pairs with [task-manager-frontend](https://github.com/trencho/task-manager-front
 
 | | |
 |---|---|
-| Language | Java 21 |
+| Language | Java 25 |
 | Framework | Spring Boot 3.5.16 |
 | Security | Spring Security + JWT (`io.jsonwebtoken`, HS256) |
 | Storage | MongoDB (Spring Data) |
@@ -20,10 +20,10 @@ Pairs with [task-manager-frontend](https://github.com/trencho/task-manager-front
 
 ## Requirements
 
-- **JDK 21.** Not 23, 24, or 25. Since JDK 23, `javac` no longer runs annotation processors found
-  on the classpath, so Lombok and MapStruct silently generate nothing and the build fails with
-  around thirty `cannot find symbol` errors that look like broken source. If you see those, check
-  `java -version` before you check the code.
+- **JDK 25** (current LTS) — the pom targets Java 25. Since JDK 23, `javac` no longer runs annotation
+  processors found only on the classpath, so the compiler plugin declares Lombok and MapStruct
+  explicitly via `annotationProcessorPaths`; that is what keeps the generated code building on 23+.
+  (It is also why JDK 21 was pinned before the processor paths were added.)
 - Docker, for `docker compose` and for the Testcontainers-backed integration tests.
 - MongoDB, if you run outside Docker.
 
