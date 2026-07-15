@@ -49,11 +49,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
-    public Optional<RefreshToken> findByToken(final String token) {
-        return refreshTokenRepository.findByToken(token);
-    }
-
-    @Override
     public boolean isTokenValid(final RefreshToken refreshToken) {
         return !refreshToken.isExpired();
     }

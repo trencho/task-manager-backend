@@ -10,8 +10,6 @@ public interface RefreshTokenService {
 
     TokenResponseDTO refreshAccessToken(String refreshToken);
 
-    Optional<RefreshToken> findByToken(String token);
-
     boolean isTokenValid(RefreshToken refreshToken);
 
     void deleteByToken(String token);
