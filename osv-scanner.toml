@@ -1,0 +1,12 @@
+# OSV-Scanner configuration. Consumed by .github/workflows/security-scan.yml.
+# Each ignore is a deliberate, documented decision — not a silence. Re-review on the date below.
+
+[[IgnoredVulns]]
+id = "GHSA-5jmj-h7xm-6q6v"   # == CVE-2026-54515
+# jackson-databind 2.21.4 (pinned transitively by the Spring Boot 3.5.16 BOM). MODERATE, CWE-915:
+# case-insensitive deserialization can bypass a per-property @JsonIgnoreProperties. Integrity-only
+# (C:N/I:L/A:N). OSV confirms NO fixed release exists — the affected ranges have no `fixed` event,
+# including none on the 2.21.x line the BOM pins — so there is nothing to upgrade to. Accepted and
+# tracked; this app does not deserialize untrusted polymorphic JSON into such types.
+ignoreUntil = 2026-10-15T00:00:00Z   # forces this back to red for re-review if still unfixed by then
+reason = "No upstream fix published; integrity-only edge case. Tracked pending a fixed jackson-databind release."

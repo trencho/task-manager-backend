@@ -1,0 +1,49 @@
+name: Security scan
+
+# Weekly OSV vulnerability scan, deliberately decoupled from the CI / merge gate: a newly-published
+# advisory surfaces as a scheduled red (and notifies the owner) without ever blocking a PR. Dependabot
+# opens upgrade PRs; this answers the other question — "is a CVE out against what we already ship?"
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  osv-scan:
+    name: OSV scan (CycloneDX SBOM)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # JDK 21 for the same reason CI pins it: the build (and so SBOM resolution) only works on 21.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Resolve the full dependency graph into target/bom.json. We scan this SBOM, not pom.xml,
+      # because OSV's live Maven resolver can choke on Spring Boot BOM-managed transitive versions —
+      # the SBOM carries the actually-resolved versions.
+      - name: Generate CycloneDX SBOM
+        run: ./mvnw -B org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom -DoutputFormat=json -DoutputName=bom
+
+      # Pinned to an exact tag: the composite scanner action's behaviour can shift in minor updates.
+      # osv-scanner.toml records the single accepted, upstream-unfixed advisory, so this goes red only
+      # when a *new* one lands.
+      - name: OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        with:
+          scan-args: |-
+            --config=osv-scanner.toml
+            -L
+            target/bom.json
