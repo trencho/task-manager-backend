@@ -29,12 +29,30 @@
         <!-- Overrides the Spring Boot BOM. Testcontainers <= 1.21.3 pins Docker API 1.32,
              which Docker Engine 29 (MinAPIVersion 1.40) rejects with a bare HTTP 400. -->
         <testcontainers.version>1.21.4</testcontainers.version>
+        <!-- Overrides the Spring Boot BOM's jackson 2.21.4: CVE-2026-54515 (GHSA-5jmj-h7xm-6q6v),
+             fixed in 2.21.5. Bumps the whole jackson suite via the managed BOM property. -->
+        <jackson-bom.version>2.21.5</jackson-bom.version>
+        <!-- Forces testcontainers' transitive commons-compress off 1.24.0 (CVE-2024-25710 +
+             CVE-2024-26308, both fixed in 1.26.0). Test scope; managed below. -->
+        <commons-compress.version>1.28.0</commons-compress.version>
 
         <bucket4j.version>8.10.1</bucket4j.version>
 
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <spotless-maven-plugin.version>3.8.0</spotless-maven-plugin.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- commons-compress isn't a Spring Boot BOM-managed property, so pin it here to lift
+                 testcontainers' transitive 1.24.0 to a patched release (see the property comment). -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>${commons-compress.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
