@@ -179,14 +179,14 @@ three endpoints that actually exist; nothing else is exposed.
 src/main/java/com/project/taskmanager/
 ├── controller/   AuthController, TaskController
 ├── service/      interfaces + impl/
-├── repository/   Spring Data MongoDB
+├── repository/   Spring Data MongoDB (+ a custom filter/sort fragment)
 ├── entity/       Task, User, RefreshToken
 ├── dto/          request/response records, bean-validated
 ├── mapper/       MapStruct entity <-> DTO
-├── security/     JwtTokenProvider, JwtAuthenticationFilter, CustomUserDetails
-├── config/       SecurityConfig
+├── security/     JwtTokenProvider, JwtAuthenticationFilter, RateLimitFilter, CustomUserDetails(Service)
+├── config/       SecurityConfig, SwaggerConfig, JwtAuthenticationEntryPoint
 ├── exception/    ControllerExceptionHandler
-└── enums/        TaskStatus
+└── enums/        TaskStatus, Priority
 ```
 
 Lombok and MapStruct are annotation processors. After changing either, rebuild clean — stale
