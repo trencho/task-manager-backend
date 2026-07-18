@@ -194,21 +194,14 @@ generated sources produce confusing compile errors.
 
 ## Roadmap
 
-Candidate features, derived from this README and the gaps between it and the code:
+Open development work, ordered by value:
 
-1. ~~**Filter and search tasks.**~~ Done — `status`, `priority`, `q` and `dueBefore` on
-   `GET /api/tasks`, combinable, on top of the existing pagination and sorting.
-2. ~~**Priority levels.**~~ Done — a `Priority` enum alongside `TaskStatus`, filterable and sortable.
-3. ~~**Let `POST /api/tasks` accept a status.**~~ Done — `status` is optional on create and
-   defaults to `PENDING`, and an update that omits it no longer nulls the field.
-4. ~~**Revoke every session for a user.**~~ Done — `POST /api/auth/logout-all`.
-5. ~~**Rate-limit the auth endpoints.**~~ Done — 5 requests per minute per client on `/login`
-   and `/signup`, in-memory and per instance.
-6. ~~**Gate the OpenAPI docs.**~~ Done — `springdoc` is disabled unless `SPRINGDOC_ENABLED=true`.
-7. ~~**Return a DTO from `GET /api/tasks`.**~~ Done — every task endpoint returns `TaskResponseDTO`,
-   which carries `id` and has no `username` field at all.
-
-Next up: due-date reminders, task tags/labels, and a bulk-update endpoint.
+1. **Due-date reminders.** Notify (or expose an endpoint listing) tasks whose `dueDate` is approaching
+   or past. First step: a scheduled query over `dueDate` for non-completed tasks per user.
+2. **Task tags/labels.** Add a `tags` field to `Task`, accept it on create/update, and let
+   `GET /api/tasks` filter by tag. First step: the entity field + DTO mapping.
+3. **Bulk-update endpoint.** A single call that updates status/priority across many task ids (owner-scoped).
+   First step: a `PATCH /api/tasks` accepting a list of ids + the fields to change.
 
 ## Security notes
 
