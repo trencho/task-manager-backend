@@ -2,6 +2,7 @@ package com.project.taskmanager;
 
 import java.time.LocalDate;
 
+import com.project.taskmanager.config.MockMvcSecurityConfig;
 import com.project.taskmanager.config.MongoTestContainerConfig;
 import com.project.taskmanager.entity.Task;
 import com.project.taskmanager.entity.User;
@@ -13,8 +14,8 @@ import com.project.taskmanager.security.CustomUserDetails;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -34,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
-@ContextConfiguration(classes = MongoTestContainerConfig.class)
+@ContextConfiguration(classes = { MongoTestContainerConfig.class, MockMvcSecurityConfig.class })
 @SpringBootTest
 class TaskControllerIntegrationTest {
 
