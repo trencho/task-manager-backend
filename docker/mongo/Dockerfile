@@ -1,4 +1,4 @@
-FROM mongo:8.0.26@sha256:ffa440e8d62533e24a67696ae1bbb46e610ebb3167d65abd122b496ae06d28e6
+FROM mongo:8.0.26@sha256:3ce3de7f40e914034b03b7dec654005ab54f7dc8306937e44ec6760d9e9409a1
 
 LABEL maintainer="Aleksandar Trenchevski <atrenchevski@gmail.com>"
 
