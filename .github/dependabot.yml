@@ -5,7 +5,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
       # One PR per week for the routine bumps, instead of five that each need a CI run.
       minor-and-patch:
@@ -34,6 +37,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: ci
 
   - package-ecosystem: docker
     directories:
@@ -41,6 +46,8 @@ updates:
       - /docker/mongo
     schedule:
       interval: weekly
+    commit-message:
+      prefix: chore
     ignore:
       # Stay on the current Java LTS (25). The build is no longer JDK-version-locked — Lombok and
       # MapStruct are declared via annotationProcessorPaths, so javac 23+ runs them — so this pin is

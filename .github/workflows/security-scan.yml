@@ -6,6 +6,9 @@ name: Security scan
 on:
   schedule:
     - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  push:
+    branches: [master]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -23,12 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # JDK 21 for the same reason CI pins it: the build (and so SBOM resolution) only works on 21.
-      - name: Set up JDK 21
+      # Pin the SAME JDK as CI (25) so SBOM resolution matches the real build — a stale JDK here
+      # (drifting from ci.yml) breaks the scan, since the project targets Java 25.
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
       # Resolve the full dependency graph into target/bom.json. We scan this SBOM, not pom.xml,
