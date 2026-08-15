@@ -5,7 +5,7 @@ name: Security scan
 # opens upgrade PRs; this answers the other question — "is a CVE out against what we already ship?"
 on:
   schedule:
-    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+    - cron: "39 7 * * 1" # weekly, Monday 07:39 UTC - fleet slot (minutes staggered per repo)
   push:
     branches: [master]
   pull_request:
