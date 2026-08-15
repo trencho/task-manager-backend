@@ -5,6 +5,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Europe/Skopje
     open-pull-requests-limit: 10
     commit-message:
       prefix: chore
@@ -14,29 +17,39 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Spring Boot 4.x removes org.springframework.boot.test.mock.mockito.MockBean, which
-      # AuthControllerIntegrationTest still imports. Dependabot opened this bump and CI
-      # caught it. Migrate deliberately, not through an automated PR.
-      - dependency-name: "org.springframework.boot:*"
-        update-types: [version-update:semver-major]
+      # REMOVED 2026-08-15, both STALE and both silently freezing a framework:
+      #
+      #   org.springframework.boot:* major - held because "Boot 4.x removes MockBean, which
+      #   AuthControllerIntegrationTest still imports". That migration SHIPPED: the parent is
+      #   4.1.0 and no MockBean import remains. The rule was still in force, so it had stopped
+      #   describing 3->4 and started blocking 4->5 for a reason that no longer existed.
+      #
+      #   org.springdoc:* major - held because "springdoc 3.x is a breaking major aligned with
+      #   Spring Boot 4". Also shipped: the pin is 3.1.0. Same shape, blocking 3->4.
+      #
+      #   org.mapstruct:* (ALL versions) - held because the only newer release was 1.7.0.Beta2.
+      #   That is a pre-release, and pre-releases are now held by the auto-merge workflow's guard
+      #   rather than by freezing the dependency outright, so a real 1.7.0 can land.
+      #
+      # This is exactly what the lift-when convention exists to stop: a hold whose reason expired,
+      # with nothing re-reading it. Every remaining entry carries a condition, and
+      # dependency-cleanup.yml re-tests them monthly.
+      # (Written without the literal marker on purpose - the cleanup job greps for it, so quoting
+      # it in prose would register this paragraph as a hold.)
 
-      # springdoc 3.x is a breaking major aligned with Spring Boot 4.
-      - dependency-name: "org.springdoc:*"
-        update-types: [version-update:semver-major]
-
-      # mapstruct's only newer release is 1.7.0.Beta2. A beta annotation processor has no
-      # business in a build.
-      - dependency-name: "org.mapstruct:*"
-
-      # Testcontainers is pinned above the Spring Boot BOM on purpose: <= 1.21.3 speaks a
-      # Docker API that Engine 29 rejects. Never let it drift downward.
+      # Testcontainers is pinned ABOVE the Spring Boot BOM on purpose: <= 1.21.3 speaks a Docker
+      # API that Engine 29 rejects. Never let it drift downward.
       - dependency-name: "org.testcontainers:*"
         update-types: [version-update:semver-major]
+        # lift-when: manual the Spring Boot BOM manages a Testcontainers version >= the one pinned here
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Skopje
     commit-message:
       prefix: ci
 
@@ -46,6 +59,9 @@ updates:
       - /docker/mongo
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Skopje
     commit-message:
       prefix: chore
     ignore:
@@ -55,6 +71,25 @@ updates:
       # deliberately at the next LTS.
       - dependency-name: "eclipse-temurin"
         update-types: [version-update:semver-major]
+        # lift-when: manual the project moves to the next Java LTS (26, expected 2027-09) - move
+        # CI's java-version, the pom, and this image together, never this pin alone
       # Stay on MongoDB's 8.0 line; 8.1+ are rapid releases.
       - dependency-name: "mongo"
         update-types: [version-update:semver-major, version-update:semver-minor]
+        # lift-when: manual production moves off the MongoDB 8.0 line; 8.1+ are rapid releases.
+        # Note Testcontainers resolves its own tag at run time, outside Dependabot's reach - if
+        # this pin moves, grep for the image name everywhere, not just here
+
+  # Compose files -- a SEPARATE ecosystem from `docker`, which does NOT cover them. Before this
+  # block existed the image tags in these files were updated by nothing at all, because
+  # `docker` was configured and containers read as handled.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Skopje
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
