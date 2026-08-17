@@ -71,8 +71,12 @@ updates:
       # deliberately at the next LTS.
       - dependency-name: "eclipse-temurin"
         update-types: [version-update:semver-major]
-        # lift-when: manual the project moves to the next Java LTS (26, expected 2027-09) - move
-        # CI's java-version, the pom, and this image together, never this pin alone
+        # lift-when: eol-lts eclipse-temurin 29
+        # Java 26 is NOT an LTS (endoflife.date: lts=false, EOL 2026-09-15) -- naming it here
+        # asked for a condition that can never be satisfied, so the hold was permanent by
+        # construction. The next LTS after 25 is 29. Machine-testable now that the cleanup
+        # job carries the eol-lts dispatcher; when it clears, move CI's java-version, the pom
+        # and this image together, never this pin alone.
       # Stay on MongoDB's 8.0 line; 8.1+ are rapid releases.
       - dependency-name: "mongo"
         update-types: [version-update:semver-major, version-update:semver-minor]
