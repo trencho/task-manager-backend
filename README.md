@@ -171,7 +171,7 @@ tasks, so the owner is not information it needs.
 The OpenAPI docs are off unless `SPRINGDOC_ENABLED=true`: an anonymous caller could otherwise read
 the full API shape of a service whose every other route is authenticated (see [Roadmap](#roadmap)
 item 6). `management.endpoints.web.exposure.include` lists only `health`, `info` and `metrics` — the
-three endpoints that actually exist; nothing else is exposed.
+three endpoints that exist; nothing else is exposed.
 
 ## Layout
 
