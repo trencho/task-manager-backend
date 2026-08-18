@@ -29,6 +29,16 @@
              as primary; the code still touches com.fasterxml.jackson (Jackson 2) via jjwt-jackson,
              so the fix must target jackson-2-bom.version, not jackson-bom.version. -->
         <jackson-2-bom.version>2.22.2</jackson-2-bom.version>
+        <!-- Overrides the Boot 4.1.0 BOM's PRIMARY Jackson 3 BOM (3.1.4): CVE-2026-59889, @JsonView
+             bypassed for @JsonUnwrapped container properties on deserialization, fixed in 3.1.5.
+             This one genuinely lives in Jackson 3 (tools.jackson.core), so unlike the entry above
+             it must target jackson-bom.version; retargeting it to jackson-2-bom would leave the
+             vulnerable artifact in place. -->
+        <jackson-bom.version>3.1.5</jackson-bom.version>
+        <!-- Overrides the Boot 4.1.0 BOM's 2.25.4: CVE-2026-49844, improper encoding of non-finite
+             floating-point values during MapMessage JSON serialization, fixed in 2.25.5. Reached
+             transitively; nothing here logs through log4j directly. -->
+        <log4j2.version>2.25.5</log4j2.version>
         <!-- Forces testcontainers' transitive commons-compress off 1.24.0 (CVE-2024-25710 +
              CVE-2024-26308, both fixed in 1.26.0). Test scope; managed below. -->
         <commons-compress.version>1.28.0</commons-compress.version>
