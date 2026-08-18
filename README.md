@@ -10,7 +10,7 @@ Pairs with [task-manager-frontend](https://github.com/trencho/task-manager-front
 | | |
 |---|---|
 | Language | Java 25 |
-| Framework | Spring Boot 3.5.16 |
+| Framework | Spring Boot 4.1.0 |
 | Security | Spring Security + JWT (`io.jsonwebtoken`, HS256) |
 | Storage | MongoDB (Spring Data) |
 | Build | Maven (wrapper committed) |
@@ -86,8 +86,8 @@ export MONGODB_URI="mongodb://localhost:27017/task-manager"
 must be running** — without one they fail rather than skip. Tests supply their own throwaway
 configuration from `src/test/resources/application.yml` and need no environment variables.
 
-JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 97% of
-instructions, 95% of branches.
+JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 98% of
+instructions, 94% of branches.
 
 CI runs `clean verify` on every push and pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
@@ -158,7 +158,7 @@ All optional, and combinable.
 | `status` | enum | `PENDING`, `IN_PROGRESS`, `COMPLETED` |
 | `priority` | enum | `LOW`, `MEDIUM`, `HIGH` |
 
-Responses additionally carry `id`. They never carry `username`: a client only ever sees its own
+Responses also carry `id`. They never carry `username`: a client only ever sees its own
 tasks, so the owner is not information it needs.
 
 ### Docs and health
@@ -205,7 +205,7 @@ Open development work, ordered by value:
 
 ## Security notes
 
-- The JWT signing secret was previously committed to this public repository. It has been removed
+- The JWT signing secret was committed to this public repository. It has been removed
   from the code, but it remains present in the git history and must be treated as compromised.
   **Rotate it.** Every token minted under the old secret is forgeable.
 - `POST /api/auth/signup` hashes passwords with BCrypt. Never insert users directly into Mongo.
