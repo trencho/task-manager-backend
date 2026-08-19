@@ -1,8 +1,13 @@
 package com.project.taskmanager.security;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
+import java.util.HexFormat;
+import java.util.Set;
 import java.util.UUID;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import javax.crypto.SecretKey;
 
@@ -21,6 +26,27 @@ public class JwtTokenProvider {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
+    /**
+     * SHA-256 digests of signing secrets that are public.
+     * <p>
+     * Both were committed to {@code src/main/resources/application.yml} in this repository's
+     * history, which is public: a real 64-character key across six reachable commits (09d72a6,
+     * b0abc2e, ccd4216, 175f43d, 06c5beb, a5c94dc) and, before it, the placeholder
+     * {@code your_jwt_secret_key}. Deleting them from the config did not unpublish them --
+     * rewriting history would not either, since pre-rewrite commits stay fetchable by SHA until
+     * GitHub-side garbage collection.
+     * <p>
+     * The signing key is the whole of authentication here: anyone holding it mints a token for any
+     * username, and every ownership check downstream trusts {@code @AuthenticationPrincipal}, which
+     * trusts the signature. So booting with one of these is a total authentication bypass, and it
+     * would be silent -- the application would start and serve traffic exactly as normal.
+     * <p>
+     * Digests rather than the values, so this guard does not republish what it exists to reject.
+     */
+    private static final Set<String> COMPROMISED_SECRET_DIGESTS = Set.of(
+            "6a58da7939a535990e307aa880d49c426bc4f1e1e768a08705ed568cd4076e54",
+            "29c1c075ba2ac0a3f16f4ca9486343758ad6e5af52c72fca11943317e3c51c71");
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -29,6 +55,37 @@ public class JwtTokenProvider {
 
     @Value("${jwt.refreshTokenExpiration}")
     private long refreshTokenExpiration;
+
+    /**
+     * Refuses to start when {@code jwt.secret} is one of the secrets published in this repository's
+     * git history.
+     * <p>
+     * Rotation is an operational act, and an operational act that is merely written down somewhere
+     * eventually does not happen. Without this, a deployment that never rotated looks identical to
+     * one that did -- it boots, it serves, and every token it accepts is forgeable. Failing at
+     * startup converts that into something impossible to miss.
+     */
+    @PostConstruct
+    public void rejectCompromisedSecret() {
+        if (COMPROMISED_SECRET_DIGESTS.contains(sha256Hex(jwtSecret))) {
+            throw new IllegalStateException(
+                    "jwt.secret is a value that was published in this repository's git history and "
+                            + "must never be used. Anyone can read it and forge a token for any user. "
+                            + "Generate a new secret, set JWT_SECRET, and invalidate outstanding "
+                            + "refresh tokens, which were issued under the old key.");
+        }
+    }
+
+    private static String sha256Hex(final String value) {
+        try {
+            final var digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (final NoSuchAlgorithmException e) {
+            // Every JVM is required to provide SHA-256, so this cannot happen -- but failing closed
+            // is the only safe reading if it somehow did.
+            throw new IllegalStateException("SHA-256 is unavailable, so jwt.secret cannot be checked", e);
+        }
+    }
 
     /**
      * Keys.hmacShaKeyFor rejects a secret shorter than the 256 bits HS256 requires. The
