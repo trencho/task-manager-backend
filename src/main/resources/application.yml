@@ -15,6 +15,21 @@ jwt:
   secret: ${JWT_SECRET}
   accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
   refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:86400000}
+  refreshCookie:
+    # The refresh token travels in an httpOnly cookie rather than the response body. It is the
+    # credential worth stealing -- long-lived, and it mints access tokens -- and in localStorage it
+    # was readable by any script on the origin, so one XSS meant persistent account takeover.
+    name: ${JWT_REFRESH_COOKIE_NAME:task_manager_refresh_token}
+    # Scoped to the auth endpoints, so it is not attached to every API call. Only login, refresh,
+    # logout and logout-all need it.
+    path: ${JWT_REFRESH_COOKIE_PATH:/api/auth}
+    # Strict is what removes the CSRF exposure an ambient credential would otherwise introduce, and
+    # it works because the SPA and the API are same-origin: axiosSetup's baseURL is empty by default,
+    # so requests go to /api/... relative to the page, proxied in dev and served together in prod.
+    sameSite: ${JWT_REFRESH_COOKIE_SAME_SITE:Strict}
+    # A Secure cookie is silently dropped over plain http, which would break a local http run with
+    # no visible cause. Must stay true anywhere reachable over a network.
+    secure: ${JWT_REFRESH_COOKIE_SECURE:true}
 
 # OpenAPI docs are OFF by default. /v3/api-docs and /swagger-ui answered 200 to anonymous
 # callers, publishing the full API shape of a service whose every other route is authenticated.

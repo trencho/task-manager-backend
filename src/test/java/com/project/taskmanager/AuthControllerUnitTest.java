@@ -9,6 +9,7 @@ import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.entity.User;
 import com.project.taskmanager.mapper.UserMapper;
 import com.project.taskmanager.security.JwtTokenProvider;
+import com.project.taskmanager.security.RefreshTokenCookie;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -46,6 +49,9 @@ class AuthControllerUnitTest {
 
     @Mock
     private JwtTokenProvider tokenProvider;
+
+    @Mock
+    private RefreshTokenCookie refreshTokenCookie;
 
     @InjectMocks
     private AuthController authController;
@@ -88,6 +94,10 @@ class AuthControllerUnitTest {
         final var refreshToken = mock(RefreshToken.class);
         when(tokenProvider.generateAccessToken(anyString())).thenReturn("mocked-jwt-token");
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(refreshToken);
+        // The controller sets the refresh cookie on this path now. The mock returns null without a
+        // stub, and ResponseCookie.toString() on null is what fails.
+        when(refreshTokenCookie.build(any()))
+                .thenReturn(ResponseCookie.from("task_manager_refresh_token", "cookie-value").build());
 
         final var response = authController.login(userLoginDTO);
 
@@ -116,8 +126,15 @@ class AuthControllerUnitTest {
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
                 .thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
+        // The controller sets the refresh cookie on this path now. The mock returns null without a
+        // stub, and ResponseCookie.toString() on null is what fails.
+        when(refreshTokenCookie.build(any()))
+                .thenReturn(ResponseCookie.from("task_manager_refresh_token", "cookie-value").build());
 
-        final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken));
+        // No cookie on the request, so the controller falls back to the body. That fallback is
+        // what lets a browser running the previous bundle keep working during the migration.
+        final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken),
+                new MockHttpServletRequest());
 
         final var body = (TokenResponseDTO) response.getBody();
         assertEquals(newAccessToken, body.accessToken());
@@ -131,7 +148,8 @@ class AuthControllerUnitTest {
         when(refreshTokenService.refreshAccessToken(refreshToken))
                 .thenThrow(new RuntimeException("Refresh token not found"));
 
-        final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken));
+        final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken),
+                new MockHttpServletRequest());
 
         assertEquals("Refresh token not found", response.getBody());
     }

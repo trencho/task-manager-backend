@@ -1,5 +1,7 @@
 package com.project.taskmanager.controller;
 
+import java.util.Optional;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import com.project.taskmanager.dto.RefreshTokenRequestDTO;
@@ -8,9 +10,11 @@ import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.mapper.UserMapper;
 import com.project.taskmanager.security.JwtTokenProvider;
+import com.project.taskmanager.security.RefreshTokenCookie;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,6 +40,7 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
     private final JwtTokenProvider tokenProvider;
+    private final RefreshTokenCookie refreshTokenCookie;
 
     @PostMapping("/signup")
     public ResponseEntity<?> register(@Valid @RequestBody final UserRegistrationDTO userRegistrationDTO) {
@@ -59,7 +64,16 @@ public class AuthController {
             final var accessToken = tokenProvider.generateAccessToken(username);
             final var refreshTokenEntity = refreshTokenService.createRefreshToken(username);
 
-            return ResponseEntity.ok(new TokenResponseDTO(accessToken, refreshTokenEntity.getToken()));
+            // The refresh token now travels in an httpOnly cookie, where no script can read it.
+            //
+            // It is STILL returned in the body as well, deliberately and temporarily. The SPA
+            // deploys separately from this service, so a release that did only one side would break
+            // sign-in for whichever shipped first: a browser on the old bundle reads the body, one
+            // on the new bundle reads the cookie. Serving both means either order works. The body
+            // field is removed once the frontend no longer reads it.
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(refreshTokenEntity.getToken()).toString())
+                    .body(new TokenResponseDTO(accessToken, refreshTokenEntity.getToken()));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(INVALID_CREDENTIALS);
         }
@@ -72,9 +86,24 @@ public class AuthController {
      */
     @PostMapping("/refresh-token")
     public ResponseEntity<Object> refreshToken(
-            @Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
+            @RequestBody(required = false) final RefreshTokenRequestDTO refreshTokenRequestDTO,
+            final HttpServletRequest request) {
+        // Cookie first, body second. The body is still accepted so a browser running the previous
+        // bundle keeps working while the two deploys catch up; it goes away in the final step.
+        final var submitted = refreshTokenCookie.read(request)
+                .orElseGet(() -> refreshTokenRequestDTO != null ? refreshTokenRequestDTO.refreshToken() : null);
+
+        if (submitted == null || submitted.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No refresh token was supplied");
+        }
+
         try {
-            return ResponseEntity.ok(refreshTokenService.refreshAccessToken(refreshTokenRequestDTO.refreshToken()));
+            final var tokens = refreshTokenService.refreshAccessToken(submitted);
+            // Rotation replaces the stored token, so the cookie has to be replaced with it --
+            // otherwise the browser keeps sending one the server has just deleted.
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(tokens.refreshToken()).toString())
+                    .body(tokens);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         }
@@ -90,9 +119,16 @@ public class AuthController {
      * it expires; that is inherent to stateless JWT, and is why the access token is short-lived.
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@Valid @RequestBody final RefreshTokenRequestDTO refreshTokenRequestDTO) {
-        refreshTokenService.deleteByToken(refreshTokenRequestDTO.refreshToken());
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> logout(
+            @RequestBody(required = false) final RefreshTokenRequestDTO refreshTokenRequestDTO,
+            final HttpServletRequest request) {
+        refreshTokenCookie.read(request)
+                .or(() -> Optional
+                        .ofNullable(refreshTokenRequestDTO != null ? refreshTokenRequestDTO.refreshToken() : null))
+                .ifPresent(refreshTokenService::deleteByToken);
+
+        // The cookie is httpOnly, so the browser cannot clear it -- only this response can.
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear().toString()).build();
     }
 
     /**
@@ -103,6 +139,8 @@ public class AuthController {
     @PostMapping("/logout-all")
     public ResponseEntity<Void> logoutAll(@AuthenticationPrincipal(expression = "username") final String username) {
         refreshTokenService.deleteByUsername(username);
-        return ResponseEntity.noContent().build();
+        // This browser's cookie goes too. Every token was revoked, so leaving it set would have the
+        // browser sending a credential the server has already deleted on every refresh attempt.
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear().toString()).build();
     }
 }
