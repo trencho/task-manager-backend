@@ -4,14 +4,13 @@ import jakarta.servlet.http.Cookie;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.taskmanager.config.MockMvcSecurityConfig;
-import com.project.taskmanager.dto.RefreshTokenRequestDTO;
-import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.entity.User;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
+import com.project.taskmanager.service.TokenPair;
 import com.project.taskmanager.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -83,9 +83,7 @@ class AuthControllerIntegrationTest {
      */
     @Test
     void shouldRevokeTheRefreshTokenOnLogout() throws Exception {
-        final var request = new RefreshTokenRequestDTO("refresh-token");
-
-        mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON).content(asJsonString(request)))
+        mockMvc.perform(post("/api/auth/logout").cookie(new Cookie(REFRESH_COOKIE, "refresh-token")))
                 .andExpect(status().isNoContent());
 
         verify(refreshTokenService).deleteByToken("refresh-token");
@@ -97,8 +95,8 @@ class AuthControllerIntegrationTest {
      */
     @Test
     void shouldTreatLogoutOfAnUnknownTokenAsSuccess() throws Exception {
-        mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(new RefreshTokenRequestDTO("never-issued")))).andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/auth/logout").cookie(new Cookie(REFRESH_COOKIE, "never-issued")))
+                .andExpect(status().isNoContent());
     }
 
     /**
@@ -162,11 +160,13 @@ class AuthControllerIntegrationTest {
 
     @Test
     void shouldRefreshFromTheCookieWithNoBody() throws Exception {
-        when(refreshTokenService.refreshAccessToken("cookie-token"))
-                .thenReturn(new TokenResponseDTO("new-access", "rotated"));
+        when(refreshTokenService.refreshAccessToken("cookie-token")).thenReturn(new TokenPair("new-access", "rotated"));
 
         mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, "cookie-token")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value("new-access"))
+                // The rotated token goes to the cookie and nowhere else. A value here would be
+                // readable by any script on the origin, which is the entire exposure.
+                .andExpect(content().string(not(containsString("rotated"))))
                 // Rotation replaced the stored token, so the cookie must carry the replacement, or
                 // the browser keeps sending one the server has just deleted.
                 .andExpect(cookie().value(REFRESH_COOKIE, "rotated"));
@@ -175,36 +175,33 @@ class AuthControllerIntegrationTest {
     }
 
     /**
-     * The compatibility path, and the reason this migration can ship in either order: a browser
-     * still running the previous bundle sends the body and no cookie.
+     * The compatibility path that let the two deploys land in either order is gone: a token sent the
+     * old way is now no more use than sending nothing. Kept as a regression test rather than deleted
+     * with the code, because "it is refused" is the assertion worth having.
      */
     @Test
-    void shouldStillAcceptTheRefreshTokenInTheBody() throws Exception {
-        when(refreshTokenService.refreshAccessToken("body-token"))
-                .thenReturn(new TokenResponseDTO("new-access", "rotated"));
-
+    void shouldNoLongerAcceptTheRefreshTokenInTheBody() throws Exception {
         mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(new RefreshTokenRequestDTO("body-token")))).andExpect(status().isOk());
+                .content("{\"refreshToken\":\"body-token\"}")).andExpect(status().isUnauthorized());
 
-        verify(refreshTokenService).refreshAccessToken("body-token");
+        verify(refreshTokenService, never()).refreshAccessToken(any());
     }
 
     @Test
-    void shouldPreferTheCookieOverTheBody() throws Exception {
-        when(refreshTokenService.refreshAccessToken("cookie-token"))
-                .thenReturn(new TokenResponseDTO("new-access", "rotated"));
+    void shouldIgnoreARefreshTokenInTheBodyWhenTheCookieIsPresent() throws Exception {
+        when(refreshTokenService.refreshAccessToken("cookie-token")).thenReturn(new TokenPair("new-access", "rotated"));
 
         mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, "cookie-token"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(new RefreshTokenRequestDTO("body-token")))).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content("{\"refreshToken\":\"body-token\"}"))
+                .andExpect(status().isOk());
 
-        // The cookie is the one this code trusts; the body exists only for the older bundle.
+        // The cookie is the only thing read; a body is not an error, it is simply not looked at.
         verify(refreshTokenService).refreshAccessToken("cookie-token");
         verify(refreshTokenService, never()).refreshAccessToken("body-token");
     }
 
     @Test
-    void shouldRejectRefreshWithNeitherCookieNorBody() throws Exception {
+    void shouldRejectRefreshWithoutTheCookie() throws Exception {
         mockMvc.perform(post("/api/auth/refresh-token")).andExpect(status().isUnauthorized());
 
         verify(refreshTokenService, never()).refreshAccessToken(any());
@@ -277,7 +274,12 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(
                 post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(asJsonString(userLoginDTO)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value(accessTokenString))
-                .andExpect(jsonPath("$.refreshToken").value(refreshTokenString));
+                // The refresh token is in the cookie and nowhere else. Asserted on the raw body
+                // rather than with jsonPath().doesNotExist(), which passes for a field that is
+                // present and null and so cannot tell a removed field from an empty one -- a
+                // populated field is the regression that matters.
+                .andExpect(content().string(not(containsString(refreshTokenString))))
+                .andExpect(cookie().value(REFRESH_COOKIE, refreshTokenString));
     }
 
     @Test
@@ -295,29 +297,26 @@ class AuthControllerIntegrationTest {
     @Test
     void shouldReturnNewAccessTokenForValidRefreshToken() throws Exception {
         final var refreshToken = "valid-refresh-token";
-        final var refreshTokenRequest = new RefreshTokenRequestDTO(refreshToken);
         final var newAccessToken = "new-access-token";
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
-                .thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
+                .thenReturn(new TokenPair(newAccessToken, "rotated-refresh-token"));
 
-        mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(refreshTokenRequest))).andExpect(status().isOk())
-                // Rotation: the response carries a new refresh token too, and it is not the
-                // one the caller presented.
-                .andExpect(jsonPath("$.accessToken").value(newAccessToken))
-                .andExpect(jsonPath("$.refreshToken").value("rotated-refresh-token"));
+        mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, refreshToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value(newAccessToken))
+                // Rotation still happens, and the replacement is not the token the caller presented
+                // -- it is just no longer visible to the caller's scripts.
+                .andExpect(cookie().value(REFRESH_COOKIE, "rotated-refresh-token"));
     }
 
     @Test
     void shouldReturnUnauthorizedForInvalidRefreshToken() throws Exception {
         final var refreshToken = "invalid-refresh-token";
-        final var refreshTokenRequest = new RefreshTokenRequestDTO(refreshToken);
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
                 .thenThrow(new RuntimeException("Refresh token not found"));
 
-        mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(refreshTokenRequest))).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, refreshToken)))
+                .andExpect(status().isUnauthorized());
     }
 }

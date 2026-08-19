@@ -1,7 +1,8 @@
 package com.project.taskmanager;
 
+import java.util.Optional;
+
 import com.project.taskmanager.controller.AuthController;
-import com.project.taskmanager.dto.RefreshTokenRequestDTO;
 import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
@@ -11,6 +12,7 @@ import com.project.taskmanager.mapper.UserMapper;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.security.RefreshTokenCookie;
 import com.project.taskmanager.service.RefreshTokenService;
+import com.project.taskmanager.service.TokenPair;
 import com.project.taskmanager.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +32,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,9 +105,9 @@ class AuthControllerUnitTest {
 
         final var response = authController.login(userLoginDTO);
 
-        final var tokenResponse = new TokenResponseDTO("mocked-jwt-token", refreshToken.getToken());
+        // The access token alone: the refresh token left the body in step 3 of the cookie migration.
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(tokenResponse, response.getBody());
+        assertEquals(new TokenResponseDTO("mocked-jwt-token"), response.getBody());
     }
 
     @Test
@@ -125,20 +129,30 @@ class AuthControllerUnitTest {
         final var newAccessToken = "new-access-token";
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
-                .thenReturn(new TokenResponseDTO(newAccessToken, "rotated-refresh-token"));
-        // The controller sets the refresh cookie on this path now. The mock returns null without a
-        // stub, and ResponseCookie.toString() on null is what fails.
+                .thenReturn(new TokenPair(newAccessToken, "rotated-refresh-token"));
+        // The cookie is now the only source the controller reads, and the only place the rotated
+        // token goes. The mock returns null without a stub, and ResponseCookie.toString() on null is
+        // what fails.
+        when(refreshTokenCookie.read(any())).thenReturn(Optional.of(refreshToken));
         when(refreshTokenCookie.build(any()))
                 .thenReturn(ResponseCookie.from("task_manager_refresh_token", "cookie-value").build());
 
-        // No cookie on the request, so the controller falls back to the body. That fallback is
-        // what lets a browser running the previous bundle keep working during the migration.
-        final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken),
-                new MockHttpServletRequest());
+        final var response = authController.refreshToken(new MockHttpServletRequest());
 
         final var body = (TokenResponseDTO) response.getBody();
         assertEquals(newAccessToken, body.accessToken());
-        assertEquals("rotated-refresh-token", body.refreshToken());
+    }
+
+    /**
+     * The migration's body fallback is gone, so a request with no cookie is refused whatever it
+     * carries -- the service is never even asked.
+     */
+    @Test
+    void shouldReturnUnauthorizedWhenNoCookieIsPresent() {
+        final var response = authController.refreshToken(new MockHttpServletRequest());
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        verify(refreshTokenService, never()).refreshAccessToken(any());
     }
 
     @Test
@@ -147,9 +161,9 @@ class AuthControllerUnitTest {
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
                 .thenThrow(new RuntimeException("Refresh token not found"));
+        when(refreshTokenCookie.read(any())).thenReturn(Optional.of(refreshToken));
 
-        final var response = authController.refreshToken(new RefreshTokenRequestDTO(refreshToken),
-                new MockHttpServletRequest());
+        final var response = authController.refreshToken(new MockHttpServletRequest());
 
         assertEquals("Refresh token not found", response.getBody());
     }
