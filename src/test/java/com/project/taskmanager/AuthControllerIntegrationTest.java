@@ -29,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -163,9 +164,9 @@ class AuthControllerIntegrationTest {
 
         mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, "cookie-token")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value("new-access"))
-                // The rotated token goes to the cookie and nowhere else. A field here would be
+                // The rotated token goes to the cookie and nowhere else. A value here would be
                 // readable by any script on the origin, which is the entire exposure.
-                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(content().string(not(containsString("rotated"))))
                 // Rotation replaced the stored token, so the cookie must carry the replacement, or
                 // the browser keeps sending one the server has just deleted.
                 .andExpect(cookie().value(REFRESH_COOKIE, "rotated"));
@@ -273,8 +274,11 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(
                 post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(asJsonString(userLoginDTO)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value(accessTokenString))
-                // The refresh token is in the cookie and nowhere else.
-                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                // The refresh token is in the cookie and nowhere else. Asserted on the raw body
+                // rather than with jsonPath().doesNotExist(), which passes for a field that is
+                // present and null and so cannot tell a removed field from an empty one -- a
+                // populated field is the regression that matters.
+                .andExpect(content().string(not(containsString(refreshTokenString))))
                 .andExpect(cookie().value(REFRESH_COOKIE, refreshTokenString));
     }
 
