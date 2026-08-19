@@ -1,5 +1,7 @@
 package com.project.taskmanager;
 
+import jakarta.servlet.http.Cookie;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.taskmanager.config.MockMvcSecurityConfig;
 import com.project.taskmanager.dto.RefreshTokenRequestDTO;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -26,6 +29,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -37,6 +41,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +50,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(MockMvcSecurityConfig.class)
 @SpringBootTest
 class AuthControllerIntegrationTest {
+
+    private static final String REFRESH_COOKIE = "task_manager_refresh_token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -113,12 +121,113 @@ class AuthControllerIntegrationTest {
         verify(refreshTokenService, never()).deleteByUsername(any());
     }
 
+    /**
+     * Was a 400, from {@code @Valid} on a required body. The body is optional now that the token
+     * normally arrives in a cookie, so "neither cookie nor token" is no longer a malformed request:
+     * it is a logout with nothing to revoke, which this endpoint already documents as a success.
+     * <p>
+     * The cookie is still cleared, which is the useful part. A client whose cookie has expired can
+     * sign out cleanly instead of being told its request was invalid.
+     */
     @Test
-    void shouldRejectLogoutWithoutARefreshToken() throws Exception {
+    void shouldAcceptLogoutWithNothingToRevokeAndStillClearTheCookie() throws Exception {
         mockMvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
 
         verify(refreshTokenService, never()).deleteByToken(any());
+    }
+
+    @Test
+    void shouldSetAnHttpOnlyRefreshCookieOnLogin() throws Exception {
+        final var userLoginDTO = new UserLoginDTO("username", "password");
+        final var authentication = mock(Authentication.class);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(authentication);
+        when(tokenProvider.generateAccessToken("username")).thenReturn("access");
+        when(refreshTokenService.createRefreshToken("username"))
+                .thenReturn(RefreshToken.builder().token("refresh-1").build());
+
+        mockMvc.perform(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(asJsonString(userLoginDTO)))
+                .andExpect(status().isOk())
+                // HttpOnly is the whole point: unreadable from JavaScript, so an XSS cannot take it.
+                .andExpect(cookie().httpOnly(REFRESH_COOKIE, true))
+                // Strict is what removes the CSRF exposure an ambient credential introduces.
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Strict")))
+                // Scoped, so it is not attached to every API call.
+                .andExpect(cookie().path(REFRESH_COOKIE, "/api/auth"))
+                .andExpect(cookie().value(REFRESH_COOKIE, "refresh-1"));
+    }
+
+    @Test
+    void shouldRefreshFromTheCookieWithNoBody() throws Exception {
+        when(refreshTokenService.refreshAccessToken("cookie-token"))
+                .thenReturn(new TokenResponseDTO("new-access", "rotated"));
+
+        mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, "cookie-token")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value("new-access"))
+                // Rotation replaced the stored token, so the cookie must carry the replacement, or
+                // the browser keeps sending one the server has just deleted.
+                .andExpect(cookie().value(REFRESH_COOKIE, "rotated"));
+
+        verify(refreshTokenService).refreshAccessToken("cookie-token");
+    }
+
+    /**
+     * The compatibility path, and the reason this migration can ship in either order: a browser
+     * still running the previous bundle sends the body and no cookie.
+     */
+    @Test
+    void shouldStillAcceptTheRefreshTokenInTheBody() throws Exception {
+        when(refreshTokenService.refreshAccessToken("body-token"))
+                .thenReturn(new TokenResponseDTO("new-access", "rotated"));
+
+        mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(new RefreshTokenRequestDTO("body-token")))).andExpect(status().isOk());
+
+        verify(refreshTokenService).refreshAccessToken("body-token");
+    }
+
+    @Test
+    void shouldPreferTheCookieOverTheBody() throws Exception {
+        when(refreshTokenService.refreshAccessToken("cookie-token"))
+                .thenReturn(new TokenResponseDTO("new-access", "rotated"));
+
+        mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, "cookie-token"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(new RefreshTokenRequestDTO("body-token")))).andExpect(status().isOk());
+
+        // The cookie is the one this code trusts; the body exists only for the older bundle.
+        verify(refreshTokenService).refreshAccessToken("cookie-token");
+        verify(refreshTokenService, never()).refreshAccessToken("body-token");
+    }
+
+    @Test
+    void shouldRejectRefreshWithNeitherCookieNorBody() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh-token")).andExpect(status().isUnauthorized());
+
+        verify(refreshTokenService, never()).refreshAccessToken(any());
+    }
+
+    @Test
+    void shouldRevokeFromTheCookieAndClearItOnLogout() throws Exception {
+        mockMvc.perform(post("/api/auth/logout").cookie(new Cookie(REFRESH_COOKIE, "cookie-token")))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        verify(refreshTokenService).deleteByToken("cookie-token");
+    }
+
+    @Test
+    @WithMockUser(username = "username")
+    void shouldClearTheCookieOnLogoutAll() throws Exception {
+        // Every token was revoked, so leaving this cookie set would have the browser sending a
+        // credential the server has already deleted on every refresh attempt.
+        mockMvc.perform(post("/api/auth/logout-all")).andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        verify(refreshTokenService).deleteByUsername("username");
     }
 
     @Test

@@ -19,6 +19,14 @@ jwt:
   secret: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
   accessTokenExpiration: 3600000
   refreshTokenExpiration: 86400000
+  # This file REPLACES the main application.yml on the test classpath rather than merging with it,
+  # so every jwt.* key the code reads has to be mirrored here. Omitting these made the whole
+  # application context fail to load with "Could not resolve placeholder jwt.refreshCookie.name".
+  refreshCookie:
+    name: task_manager_refresh_token
+    path: /api/auth
+    sameSite: Strict
+    secure: true
 
 app:
   rate-limit:
