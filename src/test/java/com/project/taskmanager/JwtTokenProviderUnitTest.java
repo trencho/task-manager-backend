@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,6 +34,33 @@ class JwtTokenProviderUnitTest {
         ReflectionTestUtils.setField(tokenProvider, "jwtSecret", SECRET);
         ReflectionTestUtils.setField(tokenProvider, "accessTokenExpiration", accessTokenExpiration);
         ReflectionTestUtils.setField(tokenProvider, "refreshTokenExpiration", refreshTokenExpiration);
+    }
+
+    @Test
+    void shouldRefuseToStartWhenTheSecretIsOneThatWasPublished() {
+        // The 64-character key that sat in src/main/resources/application.yml across six reachable
+        // commits on this public repository. Anyone can read it out of git history and forge a
+        // token for any user, so booting with it is a total authentication bypass -- and a silent
+        // one, because the application would start and serve traffic exactly as normal.
+        ReflectionTestUtils.setField(tokenProvider, "jwtSecret",
+                "0a8aa3a72b3ac3b3c8e0a6dec37b22320fa0beb87200801f03cf70b6b9a53fa4");
+
+        assertThatThrownBy(() -> tokenProvider.rejectCompromisedSecret()).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("published");
+    }
+
+    @Test
+    void shouldRefuseToStartOnTheOldPlaceholderSecret() {
+        ReflectionTestUtils.setField(tokenProvider, "jwtSecret", "your_jwt_secret_key");
+
+        assertThatThrownBy(() -> tokenProvider.rejectCompromisedSecret()).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void shouldStartOnASecretThatWasNeverPublished() {
+        // SECRET is the throwaway this suite already uses. The guard must reject the two known
+        // values and nothing else -- a check that refused everything would be just as broken.
+        assertThatCode(() -> tokenProvider.rejectCompromisedSecret()).doesNotThrowAnyException();
     }
 
     @Test
