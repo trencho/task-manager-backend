@@ -2,11 +2,11 @@ package com.project.taskmanager.service.impl;
 
 import java.util.Optional;
 
-import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.repository.RefreshTokenRepository;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
+import com.project.taskmanager.service.TokenPair;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +33,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
      */
     @Override
     @Transactional
-    public TokenResponseDTO refreshAccessToken(final String refreshToken) {
+    public TokenPair refreshAccessToken(final String refreshToken) {
         final var storedToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RuntimeException("Refresh token not found"));
 
@@ -45,7 +45,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         refreshTokenRepository.delete(storedToken);
         final var rotatedToken = refreshTokenRepository.save(jwtTokenProvider.generateRefreshToken(username));
 
-        return new TokenResponseDTO(jwtTokenProvider.generateAccessToken(username), rotatedToken.getToken());
+        return new TokenPair(jwtTokenProvider.generateAccessToken(username), rotatedToken.getToken());
     }
 
     @Override

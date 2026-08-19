@@ -1,10 +1,8 @@
 package com.project.taskmanager.controller;
 
-import java.util.Optional;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
-import com.project.taskmanager.dto.RefreshTokenRequestDTO;
 import com.project.taskmanager.dto.TokenResponseDTO;
 import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
@@ -64,34 +62,29 @@ public class AuthController {
             final var accessToken = tokenProvider.generateAccessToken(username);
             final var refreshTokenEntity = refreshTokenService.createRefreshToken(username);
 
-            // The refresh token now travels in an httpOnly cookie, where no script can read it.
-            //
-            // It is STILL returned in the body as well, deliberately and temporarily. The SPA
-            // deploys separately from this service, so a release that did only one side would break
-            // sign-in for whichever shipped first: a browser on the old bundle reads the body, one
-            // on the new bundle reads the cookie. Serving both means either order works. The body
-            // field is removed once the frontend no longer reads it.
+            // The refresh token travels in an httpOnly cookie and nowhere else. It is deliberately
+            // absent from the body: anything the body carries is readable by any script on the
+            // origin, which is the exposure this migration exists to remove.
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(refreshTokenEntity.getToken()).toString())
-                    .body(new TokenResponseDTO(accessToken, refreshTokenEntity.getToken()));
+                    .body(new TokenResponseDTO(accessToken));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(INVALID_CREDENTIALS);
         }
     }
 
     /**
-     * Returns a new access token <em>and a rotated refresh token</em>. The presented refresh
-     * token is invalidated, so a captured copy is good for at most one use. Clients must store
-     * both values from the response.
+     * Returns a new access token and rotates the refresh cookie. The presented refresh token is
+     * invalidated, so a captured copy is good for at most one use.
+     * <p>
+     * The cookie is the only accepted source. A refresh token submitted in the request body was
+     * accepted during the migration so a browser on the previous bundle kept working; that path is
+     * gone, and a caller that sends one now gets the same rejection as a caller that sends nothing.
+     * There is nothing for the client to store either way.
      */
     @PostMapping("/refresh-token")
-    public ResponseEntity<Object> refreshToken(
-            @RequestBody(required = false) final RefreshTokenRequestDTO refreshTokenRequestDTO,
-            final HttpServletRequest request) {
-        // Cookie first, body second. The body is still accepted so a browser running the previous
-        // bundle keeps working while the two deploys catch up; it goes away in the final step.
-        final var submitted = refreshTokenCookie.read(request)
-                .orElseGet(() -> refreshTokenRequestDTO != null ? refreshTokenRequestDTO.refreshToken() : null);
+    public ResponseEntity<Object> refreshToken(final HttpServletRequest request) {
+        final var submitted = refreshTokenCookie.read(request).orElse(null);
 
         if (submitted == null || submitted.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No refresh token was supplied");
@@ -103,7 +96,7 @@ public class AuthController {
             // otherwise the browser keeps sending one the server has just deleted.
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(tokens.refreshToken()).toString())
-                    .body(tokens);
+                    .body(new TokenResponseDTO(tokens.accessToken()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         }
@@ -117,15 +110,14 @@ public class AuthController {
      * Idempotent — revoking a token the server never issued is a success. A 404 would let a
      * caller probe which refresh tokens exist. The outstanding access token remains valid until
      * it expires; that is inherent to stateless JWT, and is why the access token is short-lived.
+     * <p>
+     * The cookie is the only accepted source, the migration's request-body fallback having been
+     * removed. Nothing observable changes: the response was already 204 whether or not a token was
+     * found.
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(
-            @RequestBody(required = false) final RefreshTokenRequestDTO refreshTokenRequestDTO,
-            final HttpServletRequest request) {
-        refreshTokenCookie.read(request)
-                .or(() -> Optional
-                        .ofNullable(refreshTokenRequestDTO != null ? refreshTokenRequestDTO.refreshToken() : null))
-                .ifPresent(refreshTokenService::deleteByToken);
+    public ResponseEntity<Void> logout(final HttpServletRequest request) {
+        refreshTokenCookie.read(request).ifPresent(refreshTokenService::deleteByToken);
 
         // The cookie is httpOnly, so the browser cannot clear it -- only this response can.
         return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear().toString()).build();
