@@ -2,6 +2,7 @@ package com.project.taskmanager.security;
 
 import java.time.Duration;
 import java.util.Optional;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 
 import lombok.Getter;
@@ -76,6 +77,38 @@ public class RefreshTokenCookie {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Refuses to start when {@code SameSite=None} is configured, because this application disables
+     * CSRF protection entirely and {@code SameSite} is the only thing standing in its place.
+     * <p>
+     * {@code SecurityConfig} calls {@code http.csrf(AbstractHttpConfigurer::disable)}. That is
+     * correct while the refresh cookie is {@code Strict} or {@code Lax}: the browser will not
+     * attach it to a cross-site request, so there is no ambient credential for a forged request to
+     * ride on. Set it to {@code None} and the reasoning collapses -- the cookie travels cross-site
+     * and nothing checks a token.
+     * <p>
+     * The danger is that this is a single injected string with no error attached to getting it
+     * wrong, and the repository actively invites the mistake: the README documents a cross-origin
+     * deployment via {@code VITE_API_URL}, in which a {@code Strict} cookie is never sent at all.
+     * An operator hitting that wall sees one obvious knob. Turning it silently removes the last
+     * CSRF defence, and nothing anywhere reports it.
+     * <p>
+     * Cross-site delivery is a legitimate thing to want. It just needs CSRF protection turned back
+     * on and CORS configured with credentials -- not this value flipped on its own.
+     */
+    @PostConstruct
+    public void rejectUnsafeSameSite() {
+        if (sameSite != null && "none".equalsIgnoreCase(sameSite.trim())) {
+            throw new IllegalStateException(
+                    "jwt.refreshCookie.sameSite is None, which lets the refresh cookie travel on "
+                            + "cross-site requests. This application disables CSRF protection and relies "
+                            + "on SameSite instead, so None removes the only defence and leaves the API "
+                            + "open to cross-site request forgery. Use Strict or Lax; if cross-site "
+                            + "delivery is genuinely required, enable CSRF protection and configure CORS "
+                            + "with credentials first.");
+        }
     }
 
     private ResponseCookie.ResponseCookieBuilder base(final String value) {
