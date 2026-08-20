@@ -55,6 +55,10 @@ Copy [`.env.example`](.env.example) to `.env.local` and fill it in. `.env.local`
 | `RATE_LIMIT_REFILL_PERIOD` | no | default `1m` |
 | `RATE_LIMIT_TRUST_FORWARDED_FOR` | no | default `false`. See [Security notes](#security-notes). |
 | `RATE_LIMIT_MAX_BUCKETS` | no | default `10000`. Caps the in-memory bucket map. |
+| `JWT_REFRESH_COOKIE_NAME` | no | default `task_manager_refresh_token` |
+| `JWT_REFRESH_COOKIE_PATH` | no | default `/api/auth`. Scopes the cookie to the auth endpoints, so it is not sent with every API call. |
+| `JWT_REFRESH_COOKIE_SAME_SITE` | no | default `Strict`. **`None` is refused at startup** — it removes the only CSRF defence, since CSRF protection is disabled. |
+| `JWT_REFRESH_COOKIE_SECURE` | no | default `true`. **A `Secure` cookie is silently dropped over plain `http`.** For the local `http://localhost` run below, set `JWT_REFRESH_COOKIE_SECURE=false` — otherwise login appears to succeed and the first token refresh signs you out, with nothing in any log. Must stay `true` anywhere reachable over a network. |
 
 ## Running
 
@@ -82,12 +86,12 @@ export MONGODB_URI="mongodb://localhost:27017/task-manager"
 ./mvnw clean verify
 ```
 
-94 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
+115 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
 must be running** — without one they fail rather than skip. Tests supply their own throwaway
 configuration from `src/test/resources/application.yml` and need no environment variables.
 
-JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 98% of
-instructions, 94% of branches.
+JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 97% of
+instructions, 93% of branches.
 
 CI runs `clean verify` on every push and pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
@@ -100,9 +104,9 @@ All task endpoints require `Authorization: Bearer <accessToken>`.
 | Method | Path | Body | Response |
 |---|---|---|---|
 | `POST` | `/api/auth/signup` | `{username, email, password}` | `200` text, `400` if the username is taken, or `429` |
-| `POST` | `/api/auth/login` | `{username, password}` | `{accessToken, refreshToken}`, `401`, or `429` |
-| `POST` | `/api/auth/refresh-token` | `{refreshToken}` | `{accessToken, refreshToken}` — **the refresh token is rotated**; or `401` |
-| `POST` | `/api/auth/logout` | `{refreshToken}` | `204`; revokes that refresh token |
+| `POST` | `/api/auth/login` | `{username, password}` | `{accessToken}` + a `Set-Cookie` carrying the refresh token; `401`, or `429` |
+| `POST` | `/api/auth/refresh-token` | — (the cookie is the credential) | `{accessToken}` + a rotated refresh cookie; or `401` |
+| `POST` | `/api/auth/logout` | — (the cookie is the credential) | `204`; revokes that refresh token and clears the cookie |
 | `POST` | `/api/auth/logout-all` | — | `204`; revokes **every** refresh token for the caller. **Requires authentication.** |
 
 An expired refresh token is rejected and deleted; sign in again to obtain a new one.
@@ -113,8 +117,19 @@ seconds until the allowance returns. The counters live **in the application's me
 are per instance and reset on restart — correct for this single-instance deployment, and not a
 substitute for a distributed limiter if you ever run more than one replica.
 
-**Refresh tokens rotate.** Redeeming one invalidates it and returns a replacement, so a captured
-token is good for at most one use. Clients must store both values from the response.
+**The refresh token is never in the response body, and never readable from JavaScript.** It travels
+in an `httpOnly`, `SameSite=Strict` cookie scoped to `/api/auth`, so the browser attaches it to the
+auth endpoints and nothing else, and no script on the origin can read it. Clients store **only the
+access token**. A refresh token sent in a request body is ignored: the endpoint reads the
+cookie, and answers 401 when there is none.
+
+**Refresh tokens rotate.** Redeeming one invalidates it and sets a replacement cookie, so a captured
+token is good for at most one use.
+
+`SameSite=Strict` is what makes it safe to leave CSRF protection disabled: the browser will not
+attach the cookie to a cross-site request, so there is no ambient credential to forge against. The
+application **refuses to start** if `JWT_REFRESH_COOKIE_SAME_SITE` is set to `None`, because that
+would remove the only defence in place.
 
 `logout` needs no access token — possession of the refresh token is the authority to revoke it,
 and a client whose access token has already expired must still be able to sign out. It is
