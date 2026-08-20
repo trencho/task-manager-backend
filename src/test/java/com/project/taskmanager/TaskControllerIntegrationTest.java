@@ -24,6 +24,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -208,9 +210,6 @@ class TaskControllerIntegrationTest {
     @Test
     @WithMockUser(username = USERNAME)
     void testGetAllTasks() throws Exception {
-        final var task1 = new Task("Task 1", "Description 1", LocalDate.now(), TaskStatus.PENDING, "username1");
-        taskRepository.save(task1);
-
         mockMvc.perform(get(BASE_URL).param("page", "0").param("size", "10").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Initial Task Title"))
@@ -219,9 +218,39 @@ class TaskControllerIntegrationTest {
                 // owner's username. The client needs `id` (it edits and deletes by it) and has no
                 // business knowing the owner -- it can only ever see its own tasks.
                 .andExpect(jsonPath("$.content[0].id").exists())
+                // doesNotExist() also passes for a field that is PRESENT and null. That is not a
+                // leak, so it is the right assertion here; where the value itself must not appear
+                // anywhere in the body, assert the raw content instead -- see
+                // AuthControllerIntegrationTest#shouldLoginSuccessfully.
                 .andExpect(jsonPath("$.content[0].username").doesNotExist())
                 .andExpect(jsonPath("$.page.totalElements").value(1)).andExpect(jsonPath("$.page.totalPages").value(1))
                 .andExpect(jsonPath("$.page.size").value(10)).andExpect(jsonPath("$.page.number").value(0));
+    }
+
+    /**
+     * The cross-tenant guard. Seeds a task owned by someone else and asserts the authenticated user
+     * cannot see it -- neither in the count nor in the payload.
+     * <p>
+     * This used to live inside {@code testGetAllTasks} as an unexplained extra save plus a
+     * {@code length() == 1}: the only executing check that one user cannot read another's tasks,
+     * with nothing in the name or shape to say so. Relaxing that count to {@code greaterThan(0)},
+     * or deleting the "unused" fixture, would have removed the isolation test with a green build.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void shouldNotReturnAnotherUsersTasks() throws Exception {
+        final var otherUsersTask = new Task("Task 1", "Description 1", LocalDate.now(), TaskStatus.PENDING,
+                "username1");
+        taskRepository.save(otherUsersTask);
+
+        mockMvc.perform(get(BASE_URL).param("page", "0").param("size", "10").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                // Only the caller's own task comes back...
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                // ...and it is not the other user's, asserted by value rather than by count alone.
+                .andExpect(jsonPath("$.content[0].title").value("Initial Task Title"))
+                .andExpect(content().string(not(containsString("Task 1"))));
     }
 
     @Test
