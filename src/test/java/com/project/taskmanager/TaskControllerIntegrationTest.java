@@ -246,8 +246,7 @@ class TaskControllerIntegrationTest {
         mockMvc.perform(get(BASE_URL).param("page", "0").param("size", "10").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 // Only the caller's own task comes back...
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content.length()").value(1)).andExpect(jsonPath("$.page.totalElements").value(1))
                 // ...and it is not the other user's, asserted by value rather than by count alone.
                 .andExpect(jsonPath("$.content[0].title").value("Initial Task Title"))
                 .andExpect(content().string(not(containsString("Task 1"))));
