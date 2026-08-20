@@ -33,8 +33,10 @@ jobs:
 
       - name: Build and test
         # ubuntu-latest runners ship a running Docker daemon, which the Testcontainers
-        # -backed TaskControllerIntegrationTest needs. Testcontainers is pinned to
-        # 1.21.4 in the pom; anything older speaks a Docker API the engine rejects.
+        # -backed TaskControllerIntegrationTest needs. Testcontainers is NOT pinned in the
+        # pom -- the Spring Boot BOM manages it, currently 2.0.5. Read the resolved version
+        # with `./mvnw help:evaluate -Dexpression=testcontainers.version` rather than trusting
+        # a number written here; this comment claimed 1.21.4, which was never true.
         run: ./mvnw -B clean verify
 
       - name: Upload JaCoCo coverage report
