@@ -1,6 +1,7 @@
 package com.project.taskmanager.dto;
 
 import java.time.LocalDate;
+import java.util.Set;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -10,5 +11,6 @@ import com.project.taskmanager.enums.TaskStatus;
 public record TaskDTO(
         @NotBlank(message = "Title is required") @Size(min = 3, max = 50, message = "Title must be between 3 and 50 characters") String title,
         @Size(max = 200, message = "Description must be less than 200 characters") String description,
-        LocalDate dueDate, TaskStatus status, Priority priority) {
+        LocalDate dueDate, TaskStatus status, Priority priority,
+        @Size(max = 20, message = "A task can carry at most 20 tags") Set<@NotBlank @Size(max = 30) String> tags) {
 }

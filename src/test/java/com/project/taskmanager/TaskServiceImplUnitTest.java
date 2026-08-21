@@ -12,6 +12,7 @@ import com.project.taskmanager.repository.TaskRepository;
 import com.project.taskmanager.service.impl.TaskServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -50,24 +52,25 @@ class TaskServiceImplUnitTest {
         final var tasksPage = new PageImpl<>(tasks, pageable, 2);
 
         // `findByUsername` is gone: an unfiltered listing is search(...) with every filter null.
-        when(taskRepository.search(USERNAME, null, null, null, null, pageable)).thenReturn(tasksPage);
+        when(taskRepository.search(USERNAME, null, null, null, null, null, pageable)).thenReturn(tasksPage);
 
-        final var result = taskService.getAllTasks(USERNAME, null, null, null, null, pageable);
+        final var result = taskService.getAllTasks(USERNAME, null, null, null, null, null, pageable);
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(2);
-        verify(taskRepository, times(1)).search(USERNAME, null, null, null, null, pageable);
+        verify(taskRepository, times(1)).search(USERNAME, null, null, null, null, null, pageable);
     }
 
     @Test
     void shouldPassEveryFilterThroughToTheRepository() {
         final var pageable = PageRequest.of(0, 5);
         final var dueBefore = LocalDate.now().plusDays(7);
-        when(taskRepository.search(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, pageable))
-                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+        when(taskRepository.search(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, "work",
+                pageable)).thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        taskService.getAllTasks(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, pageable);
+        taskService.getAllTasks(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, "work", pageable);
 
-        verify(taskRepository).search(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, pageable);
+        verify(taskRepository).search(USERNAME, TaskStatus.IN_PROGRESS, Priority.HIGH, "report", dueBefore, "work",
+                pageable);
     }
 
     @Test
@@ -147,5 +150,54 @@ class TaskServiceImplUnitTest {
         taskService.deleteTask(USERNAME, "1");
 
         verify(taskRepository, times(1)).deleteById("1");
+    }
+
+    @Test
+    void bulkUpdate_appliesToOwnedTasksAndSkipsTheRest() {
+        // Ids the caller does not own are skipped, not rejected. A bulk call that failed the whole
+        // batch on one foreign id would be unusable from a list UI.
+        final var mine = Task.builder().id("1").username(USERNAME).status(TaskStatus.PENDING).build();
+        final var theirs = Task.builder().id("2").username("someone-else").status(TaskStatus.PENDING).build();
+        when(taskRepository.findAllById(List.of("1", "2"))).thenReturn(List.of(mine, theirs));
+
+        final var updated = taskService.bulkUpdate(USERNAME, List.of("1", "2"), TaskStatus.COMPLETED, null);
+
+        assertEquals(1, updated);
+        assertEquals(TaskStatus.COMPLETED, mine.getStatus());
+        assertEquals(TaskStatus.PENDING, theirs.getStatus(), "another user's task must not be touched");
+    }
+
+    @Test
+    void bulkUpdate_leavesAFieldAloneWhenItIsNotSupplied() {
+        final var task = Task.builder().id("1").username(USERNAME).status(TaskStatus.PENDING).priority(Priority.LOW)
+                .build();
+        when(taskRepository.findAllById(List.of("1"))).thenReturn(List.of(task));
+
+        taskService.bulkUpdate(USERNAME, List.of("1"), null, Priority.HIGH);
+
+        assertEquals(Priority.HIGH, task.getPriority());
+        assertEquals(TaskStatus.PENDING, task.getStatus(), "status was not supplied and must be untouched");
+    }
+
+    @Test
+    void bulkUpdate_withNothingToApplyReportsZeroAndSavesNothing() {
+        // "updated 12 tasks" for a no-op request is a lie the caller would act on.
+        final var updated = taskService.bulkUpdate(USERNAME, List.of("1"), null, null);
+
+        assertEquals(0, updated);
+        verify(taskRepository, never()).findAllById(any());
+        verify(taskRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void getDueReminders_asksForTodayPlusTheLeadTime() {
+        // The bound is what makes overdue tasks appear: they are already before today, so they fall
+        // inside the window rather than dropping out of it.
+        final var captor = ArgumentCaptor.forClass(LocalDate.class);
+        when(taskRepository.findDueReminders(eq(USERNAME), captor.capture())).thenReturn(List.of());
+
+        taskService.getDueReminders(USERNAME, 3);
+
+        assertEquals(LocalDate.now().plusDays(3), captor.getValue());
     }
 }

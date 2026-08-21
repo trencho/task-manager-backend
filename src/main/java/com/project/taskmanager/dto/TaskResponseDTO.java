@@ -1,6 +1,7 @@
 package com.project.taskmanager.dto;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
@@ -13,5 +14,5 @@ import com.project.taskmanager.enums.TaskStatus;
  * {@link TaskDTO} remains the write side, where the bean-validation constraints live.
  */
 public record TaskResponseDTO(String id, String title, String description, LocalDate dueDate, TaskStatus status,
-        Priority priority) {
+        Priority priority, Set<String> tags) {
 }

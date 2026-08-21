@@ -1,6 +1,7 @@
 package com.project.taskmanager;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 import com.project.taskmanager.config.MockMvcSecurityConfig;
 import com.project.taskmanager.config.MongoTestContainerConfig;
@@ -24,12 +25,14 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -392,5 +395,109 @@ class TaskControllerIntegrationTest {
     void testDeleteTaskFailedIncorrectUser() throws Exception {
         mockMvc.perform(delete(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound()).andExpect(content().string("Task not found for user: username1"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void getAllTasks_filtersByTag() throws Exception {
+        final var tagged = new Task("Tagged", "has a tag", LocalDate.now(), TaskStatus.PENDING, USERNAME);
+        tagged.setTags(Set.of("work", "urgent"));
+        taskRepository.save(tagged);
+        final var untagged = new Task("Untagged", "no tags", LocalDate.now(), TaskStatus.PENDING, USERNAME);
+        taskRepository.save(untagged);
+
+        mockMvc.perform(get(BASE_URL).param("tag", "work")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Tagged"))
+                .andExpect(jsonPath("$.content[0].tags").isArray());
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void getAllTasks_tagFilterIsExactNotSubstring() throws Exception {
+        // "work" must not select "homework". A regex match here would, which is why the criterion
+        // is an equality rather than the `regex` the free-text search uses.
+        final var homework = new Task("Homework", "school", LocalDate.now(), TaskStatus.PENDING, USERNAME);
+        homework.setTags(Set.of("homework"));
+        taskRepository.save(homework);
+
+        mockMvc.perform(get(BASE_URL).param("tag", "work")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void createTask_roundTripsTags() throws Exception {
+        mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\": \"Tagged Task\", \"tags\": [\"alpha\"]}")).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tags[0]").value("alpha"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void getDueReminders_includesOverdueAndExcludesCompleted() throws Exception {
+        final var overdue = new Task("Overdue", "late", LocalDate.now().minusDays(3), TaskStatus.PENDING, USERNAME);
+        taskRepository.save(overdue);
+        final var soon = new Task("Soon", "coming up", LocalDate.now().plusDays(1), TaskStatus.PENDING, USERNAME);
+        taskRepository.save(soon);
+        final var far = new Task("Far", "later", LocalDate.now().plusDays(60), TaskStatus.PENDING, USERNAME);
+        taskRepository.save(far);
+        final var done = new Task("Done", "finished", LocalDate.now().minusDays(1), TaskStatus.COMPLETED, USERNAME);
+        taskRepository.save(done);
+
+        // The seeded `task` is due today and IN_PROGRESS, so it is a reminder too.
+        mockMvc.perform(get(BASE_URL + "/reminders").param("withinDays", "7")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3)).andExpect(content().string(not(containsString("\"Far\""))))
+                .andExpect(content().string(not(containsString("\"Done\""))))
+                // Soonest first: the overdue one leads.
+                .andExpect(jsonPath("$[0].title").value("Overdue"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void getDueReminders_excludesTasksWithNoDueDate() throws Exception {
+        taskRepository.deleteAll();
+        final var undated = new Task("Undated", "someday", null, TaskStatus.PENDING, USERNAME);
+        taskRepository.save(undated);
+
+        mockMvc.perform(get(BASE_URL + "/reminders")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void bulkUpdate_updatesOwnedTasksAndReportsTheCount() throws Exception {
+        final var second = new Task("Second", "another", LocalDate.now(), TaskStatus.PENDING, USERNAME);
+        taskRepository.save(second);
+
+        mockMvc.perform(patch(BASE_URL).contentType(MediaType.APPLICATION_JSON).content(
+                "{\"ids\": [\"" + task.getId() + "\", \"" + second.getId() + "\"], \"status\": \"COMPLETED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.updated").value(2));
+
+        assertThat(taskRepository.findById(task.getId()).orElseThrow().getStatus()).isEqualTo(TaskStatus.COMPLETED);
+        assertThat(taskRepository.findById(second.getId()).orElseThrow().getStatus()).isEqualTo(TaskStatus.COMPLETED);
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void bulkUpdate_skipsAnotherUsersTaskWithoutFailingTheBatch() throws Exception {
+        // Scoping is an invariant, not a filter: the foreign task must be untouched AND uncounted,
+        // while the caller's own task in the same request still lands.
+        final var theirs = new Task("Theirs", "not mine", LocalDate.now(), TaskStatus.PENDING, "someone-else");
+        taskRepository.save(theirs);
+
+        mockMvc.perform(patch(BASE_URL).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\": [\"" + task.getId() + "\", \"" + theirs.getId() + "\"], \"priority\": \"LOW\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.updated").value(1));
+
+        assertThat(taskRepository.findById(theirs.getId()).orElseThrow().getPriority()).isEqualTo(theirs.getPriority());
+        assertThat(taskRepository.findById(task.getId()).orElseThrow().getPriority()).isEqualTo(Priority.LOW);
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void bulkUpdate_rejectsAnEmptyIdList() throws Exception {
+        mockMvc.perform(patch(BASE_URL).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\": [], \"status\": \"COMPLETED\"}")).andExpect(status().isBadRequest());
     }
 }

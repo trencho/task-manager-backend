@@ -144,8 +144,10 @@ is inherent to stateless JWT, which is why it is short-lived (1 hour by default)
 | `GET` | `/api/tasks` | **Paginated, filterable.** See below. Returns a Spring `Page`. |
 | `POST` | `/api/tasks` | `201 Created` with a `Location` header. `status` defaults to `PENDING`, `priority` to `MEDIUM`. |
 | `GET` | `/api/tasks/{taskId}` | A single task |
-| `PUT` | `/api/tasks/{taskId}` | Updates the task. Omitting `status` or `priority` leaves the current value unchanged. |
+| `PUT` | `/api/tasks/{taskId}` | Updates the task. Omitting `status`, `priority` or `tags` leaves the current value unchanged. An empty `tags` array clears them. |
 | `DELETE` | `/api/tasks/{taskId}` | `204 No Content` |
+| `GET` | `/api/tasks/reminders` | Tasks due within `withinDays` (default 7, 0-365) **or already overdue**, soonest first. Excludes `COMPLETED` and tasks with no `dueDate`. |
+| `PATCH` | `/api/tasks` | **Bulk update.** Body: `{"ids": [...], "status": ..., "priority": ...}`. Applies the supplied fields across many tasks. Ids the caller does not own are skipped, not rejected; the response reports `updated`. |
 
 Every task endpoint is scoped to the authenticated caller; no combination of parameters can
 return another user's task.
@@ -162,6 +164,7 @@ All optional, and combinable.
 | `priority` | `?priority=HIGH` | Exact match |
 | `q` | `?q=groceries` | Case-insensitive substring of `title` **or** `description`. Treated as a literal, so `.*` matches nothing. |
 | `dueBefore` | `?dueBefore=2026-07-15` | Strictly before the given `YYYY-MM-DD` |
+| `tag` | `?tag=work` | Task carries this tag. **Exact match**, not a substring: `work` does not select `homework`. |
 
 ### Task shape
 
@@ -172,6 +175,7 @@ All optional, and combinable.
 | `dueDate` | `LocalDate` | `YYYY-MM-DD` |
 | `status` | enum | `PENDING`, `IN_PROGRESS`, `COMPLETED` |
 | `priority` | enum | `LOW`, `MEDIUM`, `HIGH` |
+| `tags` | string set | ≤ 20 tags, each non-blank and ≤ 30 chars |
 
 Responses also carry `id`. They never carry `username`: a client only ever sees its own
 tasks, so the owner is not information it needs.
@@ -209,14 +213,9 @@ generated sources produce confusing compile errors.
 
 ## Roadmap
 
-Open development work, ordered by value:
-
-1. **Due-date reminders.** Notify (or expose an endpoint listing) tasks whose `dueDate` is approaching
-   or past. First step: a scheduled query over `dueDate` for non-completed tasks per user.
-2. **Task tags/labels.** Add a `tags` field to `Task`, accept it on create/update, and let
-   `GET /api/tasks` filter by tag. First step: the entity field + DTO mapping.
-3. **Bulk-update endpoint.** A single call that updates status/priority across many task ids (owner-scoped).
-   First step: a `PATCH /api/tasks` accepting a list of ids + the fields to change.
+No open development work is currently tracked here. The three items this section used to
+carry — due-date reminders, task tags/labels, and a bulk-update endpoint — all ship; see
+`GET /api/tasks/reminders`, the `tags` field and its `?tag=` filter, and `PATCH /api/tasks`.
 
 ## Security notes
 
