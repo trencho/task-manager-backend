@@ -1,6 +1,7 @@
 package com.project.taskmanager.entity;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 import com.project.taskmanager.enums.Priority;
 import com.project.taskmanager.enums.TaskStatus;
@@ -27,6 +28,12 @@ public class Task {
     private TaskStatus status;
     private Priority priority;
     private String username;
+
+    /**
+     * Free-form labels. A {@link Set} rather than a list: a tag applied twice to one task means the same
+     * thing as once, and the filter would otherwise have to de-duplicate on every read.
+     */
+    private Set<String> tags;
 
     public Task(final String title, final String description, final LocalDate dueDate, final TaskStatus status,
             final String username) {
