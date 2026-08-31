@@ -46,7 +46,7 @@
         <bucket4j.version>8.19.0</bucket4j.version>
 
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-        <spotless-maven-plugin.version>3.10.0</spotless-maven-plugin.version>
+        <spotless-maven-plugin.version>3.10.1</spotless-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
