@@ -29,7 +29,7 @@ jobs:
       # Pin the SAME JDK as CI (25) so SBOM resolution matches the real build — a stale JDK here
       # (drifting from ci.yml) breaks the scan, since the project targets Java 25.
       - name: Set up JDK 25
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'

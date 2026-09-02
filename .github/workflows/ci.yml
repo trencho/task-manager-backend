@@ -25,7 +25,7 @@ jobs:
       # classpath, so the pom declares Lombok and MapStruct explicitly via annotationProcessorPaths
       # (maven-compiler-plugin) — that, not a version pin, is what keeps the generated code building.
       - name: Set up JDK 25
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
