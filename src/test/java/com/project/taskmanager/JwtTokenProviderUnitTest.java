@@ -1,6 +1,7 @@
 package com.project.taskmanager;
 
 import java.time.Instant;
+import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.project.taskmanager.security.JwtTokenProvider;
@@ -36,17 +37,40 @@ class JwtTokenProviderUnitTest {
         ReflectionTestUtils.setField(tokenProvider, "refreshTokenExpiration", refreshTokenExpiration);
     }
 
+    /**
+     * The 64-character key is covered by its DIGEST, never by its value.
+     *
+     * <p>This test used to set the real published secret verbatim, with a comment explaining that
+     * anyone can read it out of git history and forge a token for any user. Both halves were true,
+     * and writing it here put the value back into HEAD -- undoing the single reason
+     * {@code JwtTokenProvider} stores digests rather than values. A guard that republishes what it
+     * rejects is not a guard.
+     *
+     * <p>A digest is safe to publish, which is the whole point of the design, so asserting
+     * membership covers the same ground. The end-to-end trigger is proven by the container test,
+     * which may use the placeholder because a placeholder was never a key.
+     */
     @Test
-    void shouldRefuseToStartWhenTheSecretIsOneThatWasPublished() {
-        // The 64-character key that sat in src/main/resources/application.yml across six reachable
-        // commits on this public repository. Anyone can read it out of git history and forge a
-        // token for any user, so booting with it is a total authentication bypass -- and a silent
-        // one, because the application would start and serve traffic exactly as normal.
-        ReflectionTestUtils.setField(tokenProvider, "jwtSecret",
-                "0a8aa3a72b3ac3b3c8e0a6dec37b22320fa0beb87200801f03cf70b6b9a53fa4");
+    void shouldCarryTheDigestOfEachPublishedSecret() {
+        final Set<String> digests = compromisedDigests();
 
-        assertThatThrownBy(() -> tokenProvider.rejectCompromisedSecret()).isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("published");
+        assertThat(digests).as("the 64-character key published in application.yml and .env, by digest")
+                .contains("6a58da7939a535990e307aa880d49c426bc4f1e1e768a08705ed568cd4076e54");
+        assertThat(digests).as("the your_jwt_secret_key placeholder, by digest")
+                .contains("29c1c075ba2ac0a3f16f4ca9486343758ad6e5af52c72fca11943317e3c51c71");
+    }
+
+    @Test
+    void shouldNotCarryAnySecretInPlaintext() {
+        // Every entry must be 64 hex characters. A guard that gained a raw value by a well-meaning
+        // edit would fail here rather than shipping the thing it exists to reject.
+        assertThat(compromisedDigests()).as("an empty set would let this pass vacuously").isNotEmpty();
+        assertThat(compromisedDigests()).allSatisfy(digest -> assertThat(digest).matches("[0-9a-f]{64}"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Set<String> compromisedDigests() {
+        return (Set<String>) ReflectionTestUtils.getField(JwtTokenProvider.class, "COMPROMISED_SECRET_DIGESTS");
     }
 
     @Test

@@ -36,6 +36,13 @@ public class JwtTokenProvider {
      * rewriting history would not either, since pre-rewrite commits stay fetchable by SHA until
      * GitHub-side garbage collection.
      * <p>
+     * A seventh commit, 1424591, put the same 64-character value in {@code .env}, and this list did
+     * not name it until 2026-09-05. Being the same value, the digest below already covered it. The
+     * omission still mattered: an incomplete record of WHERE a secret was published is how a
+     * rotation gets declared finished while a copy is still reachable. Note also that all seven are
+     * ancestors of master, so this is not the fetchable-by-SHA case above -- a plain clone has
+     * every one of them, and {@code git log -S} finds the value in one command.
+     * <p>
      * The signing key is the whole of authentication here: anyone holding it mints a token for any
      * username, and every ownership check downstream trusts {@code @AuthenticationPrincipal}, which
      * trusts the signature. So booting with one of these is a total authentication bypass, and it

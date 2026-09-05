@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -36,6 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
 @RestController
+// @Validated is what makes the @Min/@Max on method PARAMETERS below actually run. Without it Spring
+// registers no MethodValidationPostProcessor for this bean, so the annotations read as a guard and
+// enforce nothing: ?withinDays=999999999 reached LocalDate.plusDays and answered 500. @Valid on a
+// @RequestBody is processed by the argument resolver and never needed this.
+@Validated
 public class TaskController {
 
     private final TaskMapper taskMapper;

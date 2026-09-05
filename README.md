@@ -10,7 +10,7 @@ Pairs with [task-manager-frontend](https://github.com/trencho/task-manager-front
 | | |
 |---|---|
 | Language | Java 25 |
-| Framework | Spring Boot 4.1.0 |
+| Framework | Spring Boot 4.1.1 |
 | Security | Spring Security + JWT (`io.jsonwebtoken`, HS256) |
 | Storage | MongoDB (Spring Data) |
 | Build | Maven (wrapper committed) |
@@ -86,12 +86,13 @@ export MONGODB_URI="mongodb://localhost:27017/task-manager"
 ./mvnw clean verify
 ```
 
-115 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
+137 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
 must be running** — without one they fail rather than skip. Tests supply their own throwaway
 configuration from `src/test/resources/application.yml` and need no environment variables.
 
-JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 97% of
-instructions, 93% of branches.
+JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 98% of
+instructions and 94% of branches. The 97% previously quoted here as "instructions" was the LINE
+counter, which is a different column of the same report.
 
 CI runs `clean verify` on every push and pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
