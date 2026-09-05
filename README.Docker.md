@@ -5,8 +5,8 @@ Both images are built from the digest-pinned Dockerfiles under [`docker/`](docke
 `docker/mongo`).
 
 Compose reads every required value from the environment and **refuses to start if any is unset**
-rather than substituting an empty string — the application itself fails fast on a missing
-`JWT_SECRET` or `MONGODB_URI`. So supply an env file first:
+rather than substituting an empty string. The application itself fails fast on a missing
+`JWT_SECRET` or `MONGODB_URI`. Supply an env file first:
 
 ```bash
 cp .env.example .env.local            # then fill in every blank (see the env-var table in README.md)

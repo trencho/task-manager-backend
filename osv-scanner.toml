@@ -1,7 +1,8 @@
 # OSV-Scanner configuration. Consumed by .github/workflows/security-scan.yml.
-# Add [[IgnoredVulns]] entries here ONLY for a deliberate, documented decision (a reason, and ideally
-# an `ignoreUntil` re-review date) — never to silence something fixable.
+# Add [[IgnoredVulns]] entries here ONLY for a deliberate, documented decision: a reason, and
+# ideally an `ignoreUntil` re-review date. Never to silence something fixable.
 #
-# Currently empty: as of 2026-07-15 there are no accepted-and-unfixed advisories. The jackson
-# CVE-2026-54515 that once lived here was resolved by bumping the jackson BOM to 2.21.5 (see pom.xml),
-# so it no longer needs an exception.
+# This file holds no entries. An empty file means every advisory the scanner has raised was fixed at
+# source rather than accepted, which is the state to keep it in. The jackson CVE-2026-54515 that once
+# lived here went when the jackson BOM moved to 2.21.5; see the CVE overrides in pom.xml, each of
+# which carries its own lift condition.
