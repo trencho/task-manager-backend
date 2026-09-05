@@ -1,4 +1,4 @@
-# Task Manager — Spring Boot API
+# Task Manager: Spring Boot API
 
 A RESTful API for managing personal tasks. Users register, sign in, and get JWT-authenticated
 CRUD over their own tasks. Tasks are scoped to the authenticated user: you only ever see your own.
@@ -20,7 +20,7 @@ Pairs with [task-manager-frontend](https://github.com/trencho/task-manager-front
 
 ## Requirements
 
-- **JDK 25** (current LTS) — the pom targets Java 25. Since JDK 23, `javac` no longer runs annotation
+- **JDK 25** (current LTS). The pom targets Java 25. Since JDK 23, `javac` no longer runs annotation
   processors found only on the classpath, so the compiler plugin declares Lombok and MapStruct
   explicitly via `annotationProcessorPaths`; that is what keeps the generated code building on 23+.
   (It is also why JDK 21 was pinned before the processor paths were added.)
@@ -57,8 +57,8 @@ Copy [`.env.example`](.env.example) to `.env.local` and fill it in. `.env.local`
 | `RATE_LIMIT_MAX_BUCKETS` | no | default `10000`. Caps the in-memory bucket map. |
 | `JWT_REFRESH_COOKIE_NAME` | no | default `task_manager_refresh_token` |
 | `JWT_REFRESH_COOKIE_PATH` | no | default `/api/auth`. Scopes the cookie to the auth endpoints, so it is not sent with every API call. |
-| `JWT_REFRESH_COOKIE_SAME_SITE` | no | default `Strict`. **`None` is refused at startup** — it removes the only CSRF defence, since CSRF protection is disabled. |
-| `JWT_REFRESH_COOKIE_SECURE` | no | default `true`. **A `Secure` cookie is silently dropped over plain `http`.** For the local `http://localhost` run below, set `JWT_REFRESH_COOKIE_SECURE=false` — otherwise login appears to succeed and the first token refresh signs you out, with nothing in any log. Must stay `true` anywhere reachable over a network. |
+| `JWT_REFRESH_COOKIE_SAME_SITE` | no | default `Strict`. **`None` is refused at startup**, because it removes the only CSRF defence: CSRF protection is disabled. |
+| `JWT_REFRESH_COOKIE_SECURE` | no | default `true`. **A `Secure` cookie is silently dropped over plain `http`.** For the local `http://localhost` run below, set `JWT_REFRESH_COOKIE_SECURE=false`. Otherwise login appears to succeed and the first token refresh signs you out, with nothing in any log. Must stay `true` anywhere reachable over a network. |
 
 ## Running
 
@@ -71,6 +71,8 @@ docker compose --env-file .env.local up --build
 
 Brings up the API and a MongoDB instance. Compose refuses to start if any required variable is
 unset, rather than substituting an empty string.
+[`README.Docker.md`](README.Docker.md) covers the digest-pinned images and the one-shot Mongo
+account initialisation.
 
 ### Locally
 
@@ -87,12 +89,12 @@ export MONGODB_URI="mongodb://localhost:27017/task-manager"
 ```
 
 137 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
-must be running** — without one they fail rather than skip. Tests supply their own throwaway
+must be running**. Without one they fail rather than skip. Tests supply their own throwaway
 configuration from `src/test/resources/application.yml` and need no environment variables.
 
 JaCoCo writes a coverage report to `target/site/jacoco/index.html`. Current coverage is 98% of
-instructions and 94% of branches. The 97% previously quoted here as "instructions" was the LINE
-counter, which is a different column of the same report.
+instructions, 94% of branches and 97% of lines. Name the counter when you quote one: they are three
+columns of the same report, and quoting the wrong name is how the figures here drifted.
 
 CI runs `clean verify` on every push and pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
@@ -100,22 +102,22 @@ CI runs `clean verify` on every push and pull request. See [`.github/workflows/c
 
 All task endpoints require `Authorization: Bearer <accessToken>`.
 
-### Authentication — `/api/auth`
+### Authentication: `/api/auth`
 
 | Method | Path | Body | Response |
 |---|---|---|---|
 | `POST` | `/api/auth/signup` | `{username, email, password}` | `200` text, `400` if the username is taken, or `429` |
 | `POST` | `/api/auth/login` | `{username, password}` | `{accessToken}` + a `Set-Cookie` carrying the refresh token; `401`, or `429` |
-| `POST` | `/api/auth/refresh-token` | — (the cookie is the credential) | `{accessToken}` + a rotated refresh cookie; or `401` |
-| `POST` | `/api/auth/logout` | — (the cookie is the credential) | `204`; revokes that refresh token and clears the cookie |
-| `POST` | `/api/auth/logout-all` | — | `204`; revokes **every** refresh token for the caller. **Requires authentication.** |
+| `POST` | `/api/auth/refresh-token` | none (the cookie is the credential) | `{accessToken}` + a rotated refresh cookie; or `401` |
+| `POST` | `/api/auth/logout` | none (the cookie is the credential) | `204`; revokes that refresh token and clears the cookie |
+| `POST` | `/api/auth/logout-all` | none | `204`; revokes **every** refresh token for the caller. **Requires authentication.** |
 
 An expired refresh token is rejected and deleted; sign in again to obtain a new one.
 
 **`login` and `signup` are rate-limited** to 5 requests per minute per client address, counted
 separately per endpoint. Exceeding it returns `429` with a `Retry-After` header giving the
 seconds until the allowance returns. The counters live **in the application's memory**, so they
-are per instance and reset on restart — correct for this single-instance deployment, and not a
+are per instance and reset on restart. That is correct for this single-instance deployment, and not a
 substitute for a distributed limiter if you ever run more than one replica.
 
 **The refresh token is never in the response body, and never readable from JavaScript.** It travels
@@ -132,13 +134,13 @@ attach the cookie to a cross-site request, so there is no ambient credential to 
 application **refuses to start** if `JWT_REFRESH_COOKIE_SAME_SITE` is set to `None`, because that
 would remove the only defence in place.
 
-`logout` needs no access token — possession of the refresh token is the authority to revoke it,
+`logout` needs no access token: possession of the refresh token is the authority to revoke it,
 and a client whose access token has already expired must still be able to sign out. It is
 idempotent: revoking an unknown token returns `204`, because a `404` would let a caller probe
 which refresh tokens exist. The outstanding **access** token stays valid until it expires; that
 is inherent to stateless JWT, which is why it is short-lived (1 hour by default).
 
-### Tasks — `/api/tasks`
+### Tasks: `/api/tasks`
 
 | Method | Path | Notes |
 |---|---|---|
@@ -185,13 +187,13 @@ tasks, so the owner is not information it needs.
 
 | Endpoint | Port | Auth |
 |---|---|---|
-| `/swagger-ui/index.html`, `/v3/api-docs` | application | **disabled by default** — set `SPRINGDOC_ENABLED=true` |
+| `/swagger-ui/index.html`, `/v3/api-docs` | application | **disabled by default**; set `SPRINGDOC_ENABLED=true` |
 | `/actuator/health`, `/actuator/info`, `/actuator/metrics` | management (`9090`) | `401` without credentials |
 
 The OpenAPI docs are off unless `SPRINGDOC_ENABLED=true`: an anonymous caller could otherwise read
-the full API shape of a service whose every other route is authenticated (see [Roadmap](#roadmap)
-item 6). `management.endpoints.web.exposure.include` lists only `health`, `info` and `metrics` — the
-three endpoints that exist; nothing else is exposed.
+the full API shape of a service whose every other route is authenticated.
+`management.endpoints.web.exposure.include` lists only `health`, `info` and `metrics`, the three
+endpoints that exist. Nothing else is exposed.
 
 ## Layout
 
@@ -209,14 +211,14 @@ src/main/java/com/project/taskmanager/
 └── enums/        TaskStatus, Priority
 ```
 
-Lombok and MapStruct are annotation processors. After changing either, rebuild clean — stale
+Lombok and MapStruct are annotation processors. After changing either, rebuild clean. Stale
 generated sources produce confusing compile errors.
 
 ## Roadmap
 
-No open development work is currently tracked here. The three items this section used to
-carry — due-date reminders, task tags/labels, and a bulk-update endpoint — all ship; see
-`GET /api/tasks/reminders`, the `tags` field and its `?tag=` filter, and `PATCH /api/tasks`.
+Nothing is tracked here. Due-date reminders, task tags and bulk update all shipped; they are
+documented above as `GET /api/tasks/reminders`, the `tags` field with its `?tag=` filter, and
+`PATCH /api/tasks`.
 
 ## Security notes
 
