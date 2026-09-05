@@ -40,8 +40,11 @@ services:
     image: task-manager-mongo:latest
     networks:
       - network
-    ports:
-      - "27017:27017"
+    # No ports mapping. `expose: 27017` above already reaches mongo from the app over the
+    # compose network, which is the only client. Publishing it bound the database to every
+    # host interface, so anything that could reach the host could reach mongo directly,
+    # credentials being the only thing in the way. Add a mapping back only if you need a
+    # local shell, and prefer 127.0.0.1:27017:27017 so it is not on the network.
     volumes:
       - ./docker/mongo/init/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
 
