@@ -39,11 +39,8 @@ class StartupGuardsAreInvokedTest {
         runner.withUserConfiguration(JwtOnly.class)
                 .withPropertyValues("jwt.secret=your_jwt_secret_key", "jwt.accessTokenExpiration=3600000",
                         "jwt.refreshTokenExpiration=86400000")
-                .run(context -> assertThat(context).hasFailed()
-                        .getFailure()
-                        .rootCause()
-                        .isInstanceOf(IllegalStateException.class)
-                        .hasMessageContaining("published"));
+                .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+                        .isInstanceOf(IllegalStateException.class).hasMessageContaining("published"));
     }
 
     @Test
@@ -62,11 +59,8 @@ class StartupGuardsAreInvokedTest {
                 .withPropertyValues("jwt.refreshCookie.name=t", "jwt.refreshCookie.path=/api/auth",
                         "jwt.refreshCookie.sameSite=None", "jwt.refreshCookie.secure=true",
                         "jwt.refreshTokenExpiration=86400000")
-                .run(context -> assertThat(context).hasFailed()
-                        .getFailure()
-                        .rootCause()
-                        .isInstanceOf(IllegalStateException.class)
-                        .hasMessageContaining("cross-site"));
+                .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+                        .isInstanceOf(IllegalStateException.class).hasMessageContaining("cross-site"));
     }
 
     @Test

@@ -74,12 +74,19 @@ class SecurityContractIntegrationTest {
     }
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser
+    void shouldRejectAWithinDaysOutsideTheDocumentedRange() throws Exception {
+        // TaskController declares @Min(0) @Max(365) on withinDays and the README promises that
+        // bound, but without @Validated on the class Spring never processed it: 999999999 reached
+        // LocalDate.plusDays and answered 500. 128 green tests never touched it.
+        mockMvc.perform(get("/api/tasks/reminders").param("withinDays", "999999999"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldStoreThePasswordHashedRatherThanAsGiven() {
-        userService.registerUser(User.builder()
-                .username("hashing-contract")
-                .email("hashing-contract@example.com")
-                .password(RAW_PASSWORD)
-                .build());
+        userService.registerUser(User.builder().username("hashing-contract").email("hashing-contract@example.com")
+                .password(RAW_PASSWORD).build());
 
         // Read it back out of the container. Asserting on what the service handed a mock would
         // prove only that the test's own stub returned what the test told it to.

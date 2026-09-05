@@ -165,6 +165,11 @@ class AuthControllerUnitTest {
 
         final var response = authController.refreshToken(new MockHttpServletRequest());
 
-        assertEquals("Refresh token not found", response.getBody());
+        // The body must NOT be the internal message. /api/auth/refresh-token is permitAll, so
+        // whatever lands here reaches an anonymous caller: a Mongo error, an NPE, or as here the
+        // bare "Refresh token not found". This assertion used to require that exact string, which
+        // pinned the leak in place: the test enforced the defect.
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid or expired refresh token", response.getBody());
     }
 }

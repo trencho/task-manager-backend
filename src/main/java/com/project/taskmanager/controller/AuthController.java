@@ -12,6 +12,7 @@ import com.project.taskmanager.security.RefreshTokenCookie;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @RestController
+@Slf4j
 public class AuthController {
 
     private static final String USER_REGISTERED_SUCCESSFULLY = "User registered successfully!";
@@ -98,7 +100,11 @@ public class AuthController {
                     .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(tokens.refreshToken()).toString())
                     .body(new TokenResponseDTO(tokens.accessToken()));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+            // /api/auth/refresh-token is permitAll, so this body reaches an anonymous caller. Echoing
+            // e.getMessage() handed them whatever failed inside: a Mongo error, an NPE, or the bare
+            // "Refresh token not found". Log the cause, return a fixed string.
+            log.warn("Refresh token exchange failed", e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired refresh token");
         }
     }
 
