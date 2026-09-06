@@ -4,6 +4,7 @@ import jakarta.servlet.http.Cookie;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.taskmanager.config.MockMvcSecurityConfig;
+import com.project.taskmanager.config.MongoTestContainerConfig;
 import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.entity.RefreshToken;
@@ -47,7 +48,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
-@Import(MockMvcSecurityConfig.class)
+// MongoTestContainerConfig because the application now creates its indexes at startup
+// (MongoIndexInitializer), so a context with no reachable Mongo no longer starts. Every service
+// this class drives is still mocked; the container is here to satisfy the startup step.
+@Import({ MockMvcSecurityConfig.class, MongoTestContainerConfig.class })
 @SpringBootTest
 class AuthControllerIntegrationTest {
 

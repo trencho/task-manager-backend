@@ -24,6 +24,10 @@ db.createUser({
     mechanisms: ["SCRAM-SHA-256"]
 });
 
+// Collections only. Every index this application depends on is created at startup by
+// MongoIndexInitializer, which reaches an existing deployment and a Testcontainers instance;
+// this script runs only on the first start of an empty data directory, so an index defined
+// here would exist on a fresh volume and nowhere else. One owner, not two.
 db.createCollection("users");
 db.createCollection("tasks");
 
