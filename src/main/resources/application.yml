@@ -68,5 +68,13 @@ management:
         # `httptrace` needs an HttpExchangeRepository bean, and `openapi`/`swagger-ui` are
         # springdoc paths, not actuator endpoints. Listing them was inert.
         include: health, info, metrics
+  endpoint:
+    health:
+      # Exposes the Kubernetes-style groups at /actuator/health/{liveness,readiness}. They are what
+      # the container HEALTHCHECK probes, and they are the ONLY actuator paths SecurityConfig
+      # permits anonymously: each returns a bare {"status":"UP"} and nothing else, while the
+      # aggregate /actuator/health -- which can carry component detail -- stays authenticated.
+      probes:
+        enabled: true
   server:
     port: ${MANAGEMENT_PORT:9090}

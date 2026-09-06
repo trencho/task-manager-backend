@@ -3,8 +3,21 @@ services:
     build:
       dockerfile: docker/java/Dockerfile
     container_name: spring
+    # `condition: service_healthy`, not a bare list. A bare `depends_on` waits for the mongo
+    # CONTAINER to start, not for mongod to accept connections, so the app raced its own database
+    # on every cold start. The mongo healthcheck below is what makes the condition mean something.
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    # Acts on the process EXITING. Verified rather than assumed: SIGKILL to pid 1 took RestartCount
+    # from 0 to 1 and the container came back healthy.
+    #
+    # It does NOT act on `unhealthy` -- Docker's restart policies read exit codes, not health, and
+    # restart-on-unhealthy needs swarm, an orchestrator or an external watcher. So the HEALTHCHECK
+    # in docker/java/Dockerfile buys VISIBILITY here (`docker ps` says unhealthy, and a monitor can
+    # scrape it), while this line buys recovery from a crash. Saying the pair auto-heals a wedge
+    # would overstate it, and a comment that overstates a guard mis-ranks what matters next.
+    restart: unless-stopped
     deploy:
       replicas: 1
     # `:?` makes compose refuse to start when the variable is unset, instead of
@@ -28,6 +41,16 @@ services:
     build:
       dockerfile: docker/mongo/Dockerfile
     container_name: mongo
+    restart: unless-stopped
+    # What `depends_on: condition: service_healthy` above actually waits on. `mongosh --eval` with
+    # a ping is the cheapest statement that proves mongod is ACCEPTING queries rather than merely
+    # running; `--quiet` keeps the output out of the compose log on every interval.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     deploy:
       replicas: 1
     environment:

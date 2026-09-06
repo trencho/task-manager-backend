@@ -58,6 +58,12 @@ public class SecurityConfig {
                 // establish authority -- unlike /logout, where possession of the refresh
                 // token is the authority to revoke it.
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout-all").authenticated()
+                // The two probe groups only, not "/actuator/health/**". Each returns a bare
+                // {"status":"UP"} with no component detail, which is what makes them safe to
+                // answer anonymously; the aggregate /actuator/health can carry detail and stays
+                // authenticated. They live on the management port, which docker-compose does not
+                // publish, so this widens what a container can ask -- not what the internet can.
+                .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                 .requestMatchers("/api/auth/**", "/swagger-ui/**", "/swagger-ui.html",
                         // Both forms: "/v3/api-docs/**" does not match the bare
                         // "/v3/api-docs", which is the path springdoc actually serves.

@@ -189,11 +189,19 @@ tasks, so the owner is not information it needs.
 |---|---|---|
 | `/swagger-ui/index.html`, `/v3/api-docs` | application | **disabled by default**; set `SPRINGDOC_ENABLED=true` |
 | `/actuator/health`, `/actuator/info`, `/actuator/metrics` | management (`9090`) | `401` without credentials |
+| `/actuator/health/liveness`, `/actuator/health/readiness` | management (`9090`) | anonymous |
 
 The OpenAPI docs are off unless `SPRINGDOC_ENABLED=true`: an anonymous caller could otherwise read
 the full API shape of a service whose every other route is authenticated.
 `management.endpoints.web.exposure.include` lists only `health`, `info` and `metrics`, the three
 endpoints that exist. Nothing else is exposed.
+
+The two probe groups are the exception, and the exception is narrow on purpose. Each answers a bare
+`{"status":"UP"}` with no component detail, which is what makes it safe to publish; the aggregate
+`/actuator/health` can carry database status, disk space and whatever indicator is added next, so it
+stays authenticated. The container `HEALTHCHECK` probes readiness, and `docker-compose.yml` does not
+publish port 9090, so in practice the probes are reachable from inside the container and nowhere
+else. Both properties are pinned by `SecurityContractIntegrationTest`.
 
 ## Layout
 

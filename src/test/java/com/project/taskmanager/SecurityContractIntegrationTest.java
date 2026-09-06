@@ -97,4 +97,28 @@ class SecurityContractIntegrationTest {
         assertThat(stored.getPassword()).as("BCrypt hashes carry a $2a$/$2b$/$2y$ prefix and a cost factor")
                 .matches("^\\$2[aby]\\$\\d{2}\\$.{53}$");
     }
+
+    /**
+     * The container HEALTHCHECK probes {@code /actuator/health/readiness} anonymously, so that path
+     * has to stay anonymous. Nothing else asserted it, and a permit added for one caller is exactly
+     * the kind of thing a later tidy-up removes without knowing what depended on it.
+     */
+    @Test
+    void shouldAnswerTheTwoHealthProbesAnonymously() throws Exception {
+        mockMvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+    }
+
+    /**
+     * And the permit must stay NARROW. {@code /actuator/health/**} would have been the easy matcher
+     * and would also expose the aggregate, which can carry component detail -- database status,
+     * disk space, and whatever an added indicator reports next. The two probe groups answer a bare
+     * status and nothing else, which is what makes them safe to publish.
+     */
+    @Test
+    void shouldStillRequireAuthenticationForEverythingElseUnderActuator() throws Exception {
+        mockMvc.perform(get("/actuator/health")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/info")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/metrics")).andExpect(status().isUnauthorized());
+    }
 }
