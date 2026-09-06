@@ -39,6 +39,17 @@ jobs:
         # a number written here; this comment claimed 1.21.4, which was never true.
         run: ./mvnw -B clean verify
 
+      # The Dockerfile was UNBUILDABLE from the Boot 4 migration until 2026-09-06 and nothing
+      # noticed, because nothing here built it: the extract stage ran `-Djarmode=layertools`,
+      # which Boot 4 removed, and every `docker build` died. `./mvnw verify` cannot see that --
+      # the jar is fine, it is the image that is not.
+      #
+      # No push and no registry login: this repo publishes nothing. The point is only that the
+      # Dockerfile is exercised on every PR, so the next removed flag fails here rather than the
+      # next time somebody needs an image.
+      - name: Build the container image
+        run: docker build -f docker/java/Dockerfile -t task-manager-spring:ci .
+
       - name: Upload JaCoCo coverage report
         if: always()
         uses: actions/upload-artifact@v7
