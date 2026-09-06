@@ -12,12 +12,10 @@ import com.project.taskmanager.security.RefreshTokenCookie;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.UserService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,14 +24,21 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Every failure here is mapped by {@code ControllerExceptionHandler}, the same advice
+ * {@code TaskController} has always used exclusively. This class used to catch three exception
+ * types and build the responses itself, duplicating an advice that sat beside it — and the
+ * duplication was one-sided, so the two could disagree and nothing would say so.
+ * <p>
+ * The bodies are unchanged: a bare {@code String} for a rejected signup, "Invalid credentials" for
+ * a failed login, "Invalid or expired refresh token" for a refresh that cannot be honoured.
+ */
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @RestController
-@Slf4j
 public class AuthController {
 
     private static final String USER_REGISTERED_SUCCESSFULLY = "User registered successfully!";
-    private static final String INVALID_CREDENTIALS = "Invalid credentials";
 
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
@@ -43,36 +48,28 @@ public class AuthController {
     private final RefreshTokenCookie refreshTokenCookie;
 
     @PostMapping("/signup")
-    public ResponseEntity<?> register(@Valid @RequestBody final UserRegistrationDTO userRegistrationDTO) {
-        try {
-            userService.registerUser(userMapper.toEntity(userRegistrationDTO));
-            return ResponseEntity.ok(USER_REGISTERED_SUCCESSFULLY);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<String> register(@Valid @RequestBody final UserRegistrationDTO userRegistrationDTO) {
+        userService.registerUser(userMapper.toEntity(userRegistrationDTO));
+        return ResponseEntity.ok(USER_REGISTERED_SUCCESSFULLY);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody final UserLoginDTO userLoginDTO) {
-        try {
-            final var username = userLoginDTO.username();
-            final var authentication = authenticationManager
-                    .authenticate(new UsernamePasswordAuthenticationToken(username, userLoginDTO.password()));
+    public ResponseEntity<TokenResponseDTO> login(@Valid @RequestBody final UserLoginDTO userLoginDTO) {
+        final var username = userLoginDTO.username();
+        final var authentication = authenticationManager
+                .authenticate(new UsernamePasswordAuthenticationToken(username, userLoginDTO.password()));
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            final var accessToken = tokenProvider.generateAccessToken(username);
-            final var refreshTokenEntity = refreshTokenService.createRefreshToken(username);
+        final var accessToken = tokenProvider.generateAccessToken(username);
+        final var refreshTokenEntity = refreshTokenService.createRefreshToken(username);
 
-            // The refresh token travels in an httpOnly cookie and nowhere else. It is deliberately
-            // absent from the body: anything the body carries is readable by any script on the
-            // origin, which is the exposure this migration exists to remove.
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(refreshTokenEntity.getToken()).toString())
-                    .body(new TokenResponseDTO(accessToken));
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(INVALID_CREDENTIALS);
-        }
+        // The refresh token travels in an httpOnly cookie and nowhere else. It is deliberately
+        // absent from the body: anything the body carries is readable by any script on the
+        // origin, which is the exposure this migration exists to remove.
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(refreshTokenEntity.getToken()).toString())
+                .body(new TokenResponseDTO(accessToken));
     }
 
     /**
@@ -83,6 +80,10 @@ public class AuthController {
      * accepted during the migration so a browser on the previous bundle kept working; that path is
      * gone, and a caller that sends one now gets the same rejection as a caller that sends nothing.
      * There is nothing for the client to store either way.
+     * <p>
+     * A token the server will not exchange raises {@code InvalidRefreshTokenException}, which the
+     * advice answers with 401 and a fixed string. The missing-cookie case stays here because it
+     * has its own body and no exception to carry it.
      */
     @PostMapping("/refresh-token")
     public ResponseEntity<Object> refreshToken(final HttpServletRequest request) {
@@ -92,20 +93,12 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No refresh token was supplied");
         }
 
-        try {
-            final var tokens = refreshTokenService.refreshAccessToken(submitted);
-            // Rotation replaces the stored token, so the cookie has to be replaced with it --
-            // otherwise the browser keeps sending one the server has just deleted.
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(tokens.refreshToken()).toString())
-                    .body(new TokenResponseDTO(tokens.accessToken()));
-        } catch (RuntimeException e) {
-            // /api/auth/refresh-token is permitAll, so this body reaches an anonymous caller. Echoing
-            // e.getMessage() handed them whatever failed inside: a Mongo error, an NPE, or the bare
-            // "Refresh token not found". Log the cause, return a fixed string.
-            log.warn("Refresh token exchange failed", e);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired refresh token");
-        }
+        final var tokens = refreshTokenService.refreshAccessToken(submitted);
+        // Rotation replaces the stored token, so the cookie has to be replaced with it --
+        // otherwise the browser keeps sending one the server has just deleted.
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.build(tokens.refreshToken()).toString())
+                .body(new TokenResponseDTO(tokens.accessToken()));
     }
 
     /**

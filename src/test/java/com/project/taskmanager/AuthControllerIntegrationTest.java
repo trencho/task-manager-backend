@@ -9,6 +9,7 @@ import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.entity.User;
+import com.project.taskmanager.exception.InvalidRefreshTokenException;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.TokenPair;
@@ -318,9 +319,14 @@ class AuthControllerIntegrationTest {
         final var refreshToken = "invalid-refresh-token";
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
-                .thenThrow(new RuntimeException("Refresh token not found"));
+                .thenThrow(new InvalidRefreshTokenException("Refresh token not found"));
 
         mockMvc.perform(post("/api/auth/refresh-token").cookie(new Cookie(REFRESH_COOKIE, refreshToken)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                // The fixed string, driven end to end through the advice that now owns the
+                // mapping. Asserted on the raw body as well as the status, because the regression
+                // that matters is the internal message reaching an anonymous caller.
+                .andExpect(content().string("Invalid or expired refresh token"))
+                .andExpect(content().string(not(containsString("Refresh token not found"))));
     }
 }
