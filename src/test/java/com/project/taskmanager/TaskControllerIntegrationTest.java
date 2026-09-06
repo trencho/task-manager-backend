@@ -433,6 +433,53 @@ class TaskControllerIntegrationTest {
                 .andExpect(jsonPath("$.tags[0]").value("alpha"));
     }
 
+    /**
+     * The distinction the whole tags feature rests on, and the one a client gets wrong by
+     * accident: an ABSENT tags field means leave them alone, an EMPTY array means clear them.
+     * A client that omits the field on every edit -- which is what the Vue app did until it grew a
+     * tag input -- must not lose the tags it never displayed.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void updateTask_omittingTagsLeavesThemAlone() throws Exception {
+        task.setTags(Set.of("work"));
+        taskRepository.save(task);
+
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content(UPDATED_TASK_JSON)).andExpect(status().isOk()).andExpect(jsonPath("$.tags[0]").value("work"));
+
+        assertThat(taskRepository.findById(task.getId()).orElseThrow().getTags()).containsExactly("work");
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME)
+    void updateTask_anEmptyTagsArrayClearsThem() throws Exception {
+        task.setTags(Set.of("work", "urgent"));
+        taskRepository.save(task);
+
+        mockMvc.perform(put(BASE_URL + "/{id}", task.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\": \"Updated Task Title\", \"tags\": []}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tags").isEmpty());
+
+        // Read back out of Mongo rather than trusting the response: the response is built from the
+        // saved entity, so a save that never happened would still render correctly here.
+        assertThat(taskRepository.findById(task.getId()).orElseThrow().getTags()).isEmpty();
+    }
+
+    /**
+     * The read side carries tags on every task, not only on the one that was just written. The
+     * filter selects on a field, and a client can only populate a field it can see.
+     */
+    @Test
+    @WithMockUser(username = USERNAME)
+    void getAllTasks_exposesTagsOnEveryTask() throws Exception {
+        task.setTags(Set.of("work"));
+        taskRepository.save(task);
+
+        mockMvc.perform(get(BASE_URL)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].tags[0]").value("work"));
+    }
+
     @Test
     @WithMockUser(username = USERNAME)
     void getDueReminders_includesOverdueAndExcludesCompleted() throws Exception {
