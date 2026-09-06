@@ -3,6 +3,7 @@ package com.project.taskmanager.service.impl;
 import java.util.Optional;
 
 import com.project.taskmanager.entity.RefreshToken;
+import com.project.taskmanager.exception.InvalidRefreshTokenException;
 import com.project.taskmanager.repository.RefreshTokenRepository;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.RefreshTokenService;
@@ -35,7 +36,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public TokenPair refreshAccessToken(final String refreshToken) {
         final var storedToken = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("Refresh token not found"));
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
 
         // Rejects and deletes an expired token. Without this an expired refresh token
         // kept minting access tokens for as long as the row survived.
@@ -67,7 +68,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     public Optional<RefreshToken> verifyExpiration(final RefreshToken token) {
         if (!isTokenValid(token)) {
             refreshTokenRepository.delete(token);
-            throw new IllegalArgumentException("Refresh token expired. Please sign in again.");
+            throw new InvalidRefreshTokenException("Refresh token expired. Please sign in again.");
         }
         return Optional.of(token);
     }

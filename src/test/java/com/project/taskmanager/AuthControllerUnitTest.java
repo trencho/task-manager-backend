@@ -8,6 +8,7 @@ import com.project.taskmanager.dto.UserLoginDTO;
 import com.project.taskmanager.dto.UserRegistrationDTO;
 import com.project.taskmanager.entity.RefreshToken;
 import com.project.taskmanager.entity.User;
+import com.project.taskmanager.exception.InvalidRefreshTokenException;
 import com.project.taskmanager.mapper.UserMapper;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.security.RefreshTokenCookie;
@@ -28,6 +29,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -77,15 +79,21 @@ class AuthControllerUnitTest {
         assertEquals("User registered successfully!", response.getBody());
     }
 
+    /**
+     * The controller no longer maps this to a status; ControllerExceptionHandler does. What is
+     * asserted here is that it PROPAGATES rather than being swallowed. The status and the body are
+     * pinned by ControllerExceptionHandlerUnitTest and driven for real by
+     * AuthControllerIntegrationTest.
+     */
     @Test
-    void shouldReturnBadRequestWhenRegisterUserFails() {
+    void shouldPropagateARejectedRegistration() {
         final var userRegistrationDTO = new UserRegistrationDTO("username", "email@example.com", "password");
         when(userMapper.toEntity(userRegistrationDTO)).thenThrow(new IllegalArgumentException("User already exists"));
 
-        final var response = authController.register(userRegistrationDTO);
+        final var thrown = assertThrows(IllegalArgumentException.class,
+                () -> authController.register(userRegistrationDTO));
 
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("User already exists", response.getBody());
+        assertEquals("User already exists", thrown.getMessage());
     }
 
     @Test
@@ -111,16 +119,16 @@ class AuthControllerUnitTest {
     }
 
     @Test
-    void shouldFailLoginWithInvalidCredentials() {
+    void shouldPropagateBadCredentials() {
         final var userLoginDTO = new UserLoginDTO("username", "wrongPassword");
 
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Invalid credentials"));
 
-        final var response = authController.login(userLoginDTO);
+        assertThrows(BadCredentialsException.class, () -> authController.login(userLoginDTO));
 
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertEquals("Invalid credentials", response.getBody());
+        // No token is minted for a caller who failed authentication.
+        verify(refreshTokenService, never()).createRefreshToken(any());
     }
 
     @Test
@@ -155,21 +163,23 @@ class AuthControllerUnitTest {
         verify(refreshTokenService, never()).refreshAccessToken(any());
     }
 
+    /**
+     * The internal message must never reach the caller. That guarantee moved to the advice, which
+     * answers a fixed string and logs the cause -- ControllerExceptionHandlerUnitTest pins the
+     * literal and asserts the message does not survive. What is left to assert here is that the
+     * controller refuses to build a token response out of a failed exchange.
+     */
     @Test
-    void shouldReturnUnauthorizedForInvalidRefreshToken() {
+    void shouldNotAnswerWithATokenWhenTheExchangeFails() {
         final var refreshToken = "invalid-refresh-token";
 
         when(refreshTokenService.refreshAccessToken(refreshToken))
-                .thenThrow(new RuntimeException("Refresh token not found"));
+                .thenThrow(new InvalidRefreshTokenException("Refresh token not found"));
         when(refreshTokenCookie.read(any())).thenReturn(Optional.of(refreshToken));
 
-        final var response = authController.refreshToken(new MockHttpServletRequest());
+        assertThrows(InvalidRefreshTokenException.class,
+                () -> authController.refreshToken(new MockHttpServletRequest()));
 
-        // The body must NOT be the internal message. /api/auth/refresh-token is permitAll, so
-        // whatever lands here reaches an anonymous caller: a Mongo error, an NPE, or as here the
-        // bare "Refresh token not found". This assertion used to require that exact string, which
-        // pinned the leak in place: the test enforced the defect.
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertEquals("Invalid or expired refresh token", response.getBody());
+        verify(refreshTokenCookie, never()).build(any());
     }
 }

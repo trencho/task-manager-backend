@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import com.project.taskmanager.entity.RefreshToken;
+import com.project.taskmanager.exception.InvalidRefreshTokenException;
 import com.project.taskmanager.repository.RefreshTokenRepository;
 import com.project.taskmanager.security.JwtTokenProvider;
 import com.project.taskmanager.service.impl.RefreshTokenServiceImpl;
@@ -89,7 +90,7 @@ class RefreshTokenServiceImplUnitTest {
         final var expired = tokenExpiringAt(Instant.now().minus(1, ChronoUnit.SECONDS));
         when(refreshTokenRepository.findByToken(TOKEN)).thenReturn(Optional.of(expired));
 
-        final var thrown = assertThrows(IllegalArgumentException.class,
+        final var thrown = assertThrows(InvalidRefreshTokenException.class,
                 () -> refreshTokenService.refreshAccessToken(TOKEN));
 
         assertThat(thrown.getMessage()).contains("expired");
@@ -127,7 +128,7 @@ class RefreshTokenServiceImplUnitTest {
     void verifyExpirationDeletesTheTokenItRejects() {
         final var expired = tokenExpiringAt(Instant.now().minus(1, ChronoUnit.MINUTES));
 
-        assertThrows(IllegalArgumentException.class, () -> refreshTokenService.verifyExpiration(expired));
+        assertThrows(InvalidRefreshTokenException.class, () -> refreshTokenService.verifyExpiration(expired));
         verify(refreshTokenRepository).delete(expired);
     }
 

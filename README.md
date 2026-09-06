@@ -88,7 +88,7 @@ export MONGODB_URI="mongodb://localhost:27017/task-manager"
 ./mvnw clean verify
 ```
 
-137 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
+154 tests. The integration tests start a real MongoDB through Testcontainers, so **a Docker daemon
 must be running**. Without one they fail rather than skip. Tests supply their own throwaway
 configuration from `src/test/resources/application.yml` and need no environment variables.
 

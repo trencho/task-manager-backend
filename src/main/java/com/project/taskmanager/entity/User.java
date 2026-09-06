@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "users")
@@ -21,7 +20,10 @@ public class User {
     @Id
     private String id;
 
-    @Indexed
+    // Indexed, uniquely, by MongoIndexInitializer. It carried an @Indexed annotation here, which
+    // created nothing: auto-index-creation is off by default and this repository never turns it on.
+    // Do not add one back — an annotation that reads as a constraint and enforces nothing is worse
+    // than a bare field.
     private String username;
 
     private String email;
