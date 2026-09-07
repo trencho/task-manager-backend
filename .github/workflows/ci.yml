@@ -47,8 +47,22 @@ jobs:
       # No push and no registry login: this repo publishes nothing. The point is only that the
       # Dockerfile is exercised on every PR, so the next removed flag fails here rather than the
       # next time somebody needs an image.
+      # buildx, for the layer cache. The Dockerfile already mounts a Maven cache, but a cache MOUNT
+      # lives in the builder's local state and every CI run gets a fresh builder, so it starts empty
+      # every time and the `deps` stage re-resolves the whole tree. type=gha persists the LAYERS
+      # across runs, which is the part a mount cannot do. mode=max because this is a four-stage
+      # build (deps -> package -> extract -> final): without it only `final` is exported, and `deps`
+      # -- the slow one, and the whole reason to cache -- is not.
+      - uses: docker/setup-buildx-action@v4
       - name: Build the container image
-        run: docker build -f docker/java/Dockerfile -t task-manager-spring:ci .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/java/Dockerfile
+          push: false
+          tags: task-manager-spring:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Upload JaCoCo coverage report
         if: always()
