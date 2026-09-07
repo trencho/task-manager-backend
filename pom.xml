@@ -21,7 +21,7 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <!-- Bridges Lombok and MapStruct when both run in the annotation-processor path. -->
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
-        <lombok.version>1.18.46</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
         <!-- Overrides the Spring Boot 4.1.1 BOM's 1.5.38: CVE-2026-10532 (GHSA-jhq6-gfmj-v8fx).
              Note this crosses a minor line Boot does not test against, which is a deliberate call.
              lift-when: manual Boot's BOM ships logback >= 1.6.3 -->
