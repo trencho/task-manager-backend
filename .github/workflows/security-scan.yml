@@ -60,7 +60,7 @@ jobs:
       # osv-scanner.toml records the single accepted, upstream-unfixed advisory, so this goes red only
       # when a *new* one lands.
       - name: OSV-Scanner
-        uses: google/osv-scanner-action/osv-scanner-action@v2.5.1
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
         with:
           scan-args: |-
             --config=osv-scanner.toml
