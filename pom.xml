@@ -46,7 +46,7 @@
              lift-when: manual Boot's BOM ships tomcat >= 11.0.25 (4.1.2 did not exist on 2026-09-05) -->
         <tomcat.version>11.0.25</tomcat.version>
 
-        <bucket4j.version>8.19.0</bucket4j.version>
+        <bucket4j.version>8.20.0</bucket4j.version>
 
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <spotless-maven-plugin.version>3.10.2</spotless-maven-plugin.version>
