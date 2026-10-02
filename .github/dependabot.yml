@@ -28,7 +28,7 @@ updates:
       #   Spring Boot 4". Also shipped: the pin is 3.1.0. Same shape, blocking 3->4.
       #
       #   org.mapstruct:* (ALL versions) - held because the only newer release was 1.7.0.Beta2.
-      #   That is a pre-release, and pre-releases are now held by the auto-merge workflow's guard
+      #   That is a pre-release, and pre-releases are now held by the guard in ci.yml's auto-merge job
       #   rather than by freezing the dependency outright, so a real 1.7.0 can land.
       #
       # This is exactly what the lift-when convention exists to stop: a hold whose reason expired,

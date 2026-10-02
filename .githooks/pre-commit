@@ -1,0 +1,72 @@
+#!/bin/sh
+# Pre-commit hook: runs `spotless:apply` (the formatter `verify` checks) and re-stages the Java files
+# that were staged.
+#
+# A Java file whose changes are all staged is formatted and re-staged. A file with unstaged edits on
+# top of its staged version is only checked: re-adding it would sweep those edits into this commit.
+# If Spotless reformats one, the commit stops and you stage the result yourself.
+#
+# Two limits that come from Spotless, not from this script. It cannot read stdin, so for a partially
+# staged file it judges the WORKING COPY rather than the staged blob; `spotless:check` in the build
+# catches the rare case where the two differ. And `spotless:apply` formats the whole tree, so files you
+# did not stage can come out reformatted in the working tree. They stay unstaged; nothing outside the
+# staged set enters the commit. (`ratchetFrom` in the Spotless config narrows it to changed files.)
+#
+# Wiring, all three needed:
+#   once per clone  git config core.hooksPath .githooks      (say so in the README)
+#   .gitattributes  .githooks/* text eol=lf                   (a CRLF copy of a sh script does not run)
+#   git index       mode 100755                               (git update-index --chmod=+x .githooks/pre-commit)
+#
+# `git commit --no-verify` skips the hook.
+
+set -u
+set -f
+
+nl='
+'
+IFS=$nl
+
+if [ ! -x ./mvnw ]; then
+  echo "pre-commit: ./mvnw not found or not executable; this hook expects the Maven wrapper" >&2
+  exit 1
+fi
+
+staged=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR -- '*.java')
+[ -n "$staged" ] || exit 0
+unstaged=$(git -c core.quotePath=false diff --name-only -- '*.java')
+
+full=''
+partial=''
+for f in $staged; do
+  if printf '%s\n' "$unstaged" | grep -Fqx -- "$f"; then
+    partial="$partial$(cksum < "$f") $f$nl"
+  else
+    full="$full$f$nl"
+  fi
+done
+
+echo "pre-commit: spotless:apply..."
+./mvnw -q spotless:apply || { echo "pre-commit: spotless:apply failed" >&2; exit 1; }
+
+for f in $full; do
+  git add -- "$f" || exit 1
+done
+
+changed=''
+for line in $partial; do
+  # A line is "<crc> <size> <path>", and the path may contain spaces.
+  f=$(printf '%s\n' "$line" | cut -d' ' -f3-)
+  sum=$(printf '%s\n' "$line" | cut -d' ' -f1-2)
+  [ "$(cksum < "$f")" = "$sum" ] || changed="$changed  $f$nl"
+done
+
+if [ -n "$changed" ]; then
+  {
+    echo "pre-commit: Spotless reformatted files that also have unstaged changes:"
+    printf '%s' "$changed"
+    echo "They were left unstaged so your unstaged edits stay out of this commit."
+    echo "Review the result with 'git diff', stage what belongs in the commit, and commit again."
+  } >&2
+  exit 1
+fi
+exit 0

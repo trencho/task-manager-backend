@@ -97,6 +97,15 @@ instructions, 94% of branches and 97% of lines. Name the counter when you quote 
 columns of the same report, and quoting the wrong name is how the figures here drifted.
 
 CI runs `clean verify` on every push and pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Dependabot PRs merge from the `auto-merge` job in the same workflow once the build passes; pre-release
+targets and GitHub Actions bumps are held for a human.
+
+A pre-commit hook runs `spotless:apply` and re-stages the Java files you staged. Enable it once per
+clone:
+
+```bash
+git config core.hooksPath .githooks
+```
 
 ## API
 
