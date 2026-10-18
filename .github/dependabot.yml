@@ -81,8 +81,9 @@ updates:
       - dependency-name: "mongo"
         update-types: [version-update:semver-major, version-update:semver-minor]
         # lift-when: manual production moves off the MongoDB 8.0 line; 8.1+ are rapid releases.
-        # Note Testcontainers resolves its own tag at run time, outside Dependabot's reach - if
-        # this pin moves, grep for the image name everywhere, not just here
+        # The integration tests read their image from docker/mongo/Dockerfile's last FROM line
+        # (MongoTestContainerConfig.productionMongoImage), so a bump here moves them too. A FROM
+        # that uses a build argument fails those tests on purpose: resolve it there first.
 
   # Compose files -- a SEPARATE ecosystem from `docker`, which does NOT cover them. Before this
   # block existed the image tags in these files were updated by nothing at all, because
