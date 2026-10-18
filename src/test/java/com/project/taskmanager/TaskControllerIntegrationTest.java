@@ -12,6 +12,7 @@ import com.project.taskmanager.enums.TaskStatus;
 import com.project.taskmanager.repository.TaskRepository;
 import com.project.taskmanager.repository.UserRepository;
 import com.project.taskmanager.security.CustomUserDetails;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -89,6 +91,14 @@ class TaskControllerIntegrationTest {
         when(securityContext.getAuthentication()).thenReturn(authentication);
 
         SecurityContextHolder.setContext(securityContext);
+    }
+
+    // setUp installs a mock authentication on this thread, and MockMvc copies it into
+    // TestSecurityContextHolder's own thread-local. Without clearing both, the next test class to run
+    // here starts signed in. TestSecurityContextHolder.clearContext() clears both holders.
+    @AfterEach
+    void clearSecurityContext() {
+        TestSecurityContextHolder.clearContext();
     }
 
     /**
