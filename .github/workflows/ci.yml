@@ -37,19 +37,24 @@ jobs:
 
       # A merged pull request was already built and tested by this workflow on its head. When that
       # head has the identical tree, the master run would only repeat the result, so this step skips
-      # the JDK setup, the build and tests, and the image build. It skips them only when all three
-      # hold: this commit is a PR's merge commit, the PR head has the same tree, and a ci.yml run on
-      # that head in the pull_request event succeeded. Everything else runs them: a direct push, a
-      # PR merged while behind master (a different tree), a failed, missing or cancelled PR run, and
-      # any API error. The owner accepted the cost on 2026-10-18: master no longer tries a second
-      # shuffle seed per merge, the check that caught the order bug fixed in #65.
+      # `Build and test`. It skips only on a push, or on the dispatch the `auto-merge` job sends with
+      # GITHUB_TOKEN, and only when all three hold: this commit is a PR's merge commit, the PR head
+      # has the same tree, and the `build + test (JDK 25)` job passed in a pull_request run of
+      # ci.yml on that head. Everything else runs the tests: a direct push, a PR merged while behind
+      # master (a different tree), a failed, missing or cancelled PR job, and any API error. A manual
+      # dispatch always runs them, so dispatching CI on master is the way to get an extra seed. A
+      # Maven cache miss also runs them once, so master's cache picks up a dependency change. The
+      # owner accepted the cost on 2026-10-18: master no longer tries a second shuffle seed per merge,
+      # the check that caught the order bug fixed in #65.
       - name: Check whether ci.yml already tested this tree
         id: tested
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.triggering_actor == 'github-actions[bot]')
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          # This job's display name, as the jobs API reports it. A rename finds nothing and runs.
+          JOB_NAME: build + test (JDK 25)
         run: |
           tested=false
           reason="no merged pull request has this commit as its merge commit"
@@ -63,16 +68,25 @@ jobs:
             head_tree=$(gh api "repos/$REPO/git/commits/$head" --jq .tree.sha) || head_tree=""
             if [ -z "$merged_tree" ] || [ "$merged_tree" != "$head_tree" ]; then
               reason="#$num's head tree differs from the merged tree"
+            elif ! runs=$(gh api "repos/$REPO/actions/runs?head_sha=$head&event=pull_request&per_page=100" \
+              --jq '.workflow_runs[] | select(.path == ".github/workflows/ci.yml") | .id'); then
+              reason="the run lookup for #$num's head ${head:0:7} failed"
             else
-              runs=$(gh api "repos/$REPO/actions/runs?head_sha=$head&event=pull_request&per_page=100" \
-                --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .conclusion == "success")] | length') ||
-                runs=""
-              if [ -n "$runs" ] && [ "$runs" -gt 0 ]; then
-                tested=true
-                reason="#$num's head ${head:0:7} has the same tree and its ci.yml run succeeded"
-              else
-                reason="#$num's head ${head:0:7} has no successful ci.yml pull_request run (${runs:-lookup failed})"
-              fi
+              reason="no successful '$JOB_NAME' job on #$num's head ${head:0:7}"
+              for id in $runs; do
+                count=$(gh api "repos/$REPO/actions/runs/$id/jobs?filter=latest&per_page=100" \
+                  --jq "[.jobs[] | select(.name == \"$JOB_NAME\" and .conclusion == \"success\")] | length") ||
+                  count=""
+                case "$count" in
+                  '' | *[!0-9]*) reason="the job lookup for run $id failed" ;;
+                  0) ;;
+                  *)
+                    tested=true
+                    reason="#$num's head ${head:0:7} has the same tree and its '$JOB_NAME' job passed in run $id"
+                    break
+                    ;;
+                esac
+              done
             fi
           fi
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
@@ -84,7 +98,7 @@ jobs:
       # classpath, so the pom declares Lombok and MapStruct explicitly via annotationProcessorPaths
       # (maven-compiler-plugin) — that, not a version pin, is what keeps the generated code building.
       - name: Set up JDK 25
-        if: steps.tested.outputs.tested != 'true'
+        id: setup
         uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -92,7 +106,9 @@ jobs:
           cache: maven
 
       - name: Build and test
-        if: steps.tested.outputs.tested != 'true'
+        # On a Maven cache miss this runs even on a tested tree, because setup-java saves ~/.m2 only
+        # if Maven filled it, and master's cache is the one other PRs restore.
+        if: steps.tested.outputs.tested != 'true' || steps.setup.outputs.cache-hit != 'true'
         # ubuntu-latest runners ship a running Docker daemon, which the Testcontainers
         # -backed TaskControllerIntegrationTest needs. Testcontainers is NOT pinned in the
         # pom -- the Spring Boot BOM manages it, currently 2.0.5. Read the resolved version
@@ -129,9 +145,7 @@ jobs:
       # build (deps -> package -> extract -> final): without it only `final` is exported, and `deps`
       # -- the slow one, and the whole reason to cache -- is not.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        if: steps.tested.outputs.tested != 'true'
       - name: Build the container image
-        if: steps.tested.outputs.tested != 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
