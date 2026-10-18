@@ -44,7 +44,21 @@ jobs:
         # pom -- the Spring Boot BOM manages it, currently 2.0.5. Read the resolved version
         # with `./mvnw help:evaluate -Dexpression=testcontainers.version` rather than trusting
         # a number written here; this comment claimed 1.21.4, which was never true.
-        run: ./mvnw -B clean verify
+        #
+        # Every run shuffles test classes (Surefire) and methods (JUnit), seeded by the run id. A
+        # re-run keeps the run id and replays the same order, so it cannot clear an order failure:
+        # fix the test, or push for a new seed. The log and the run summary name the seed; a local
+        # `./mvnw -B clean verify` with the same four flags reproduces it.
+        env:
+          SEED: ${{ github.run_id }}
+        run: |
+          echo "Shuffled test order, seed $SEED"
+          echo "Shuffled test order, seed \`$SEED\`" >> "$GITHUB_STEP_SUMMARY"
+          ./mvnw -B clean verify \
+            -Dsurefire.runOrder=random \
+            "-Dsurefire.runOrder.random.seed=$SEED" \
+            "-Djunit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer\$Random" \
+            "-Djunit.jupiter.execution.order.random.seed=$SEED"
 
       # The Dockerfile was UNBUILDABLE from the Boot 4 migration until 2026-09-06 and nothing
       # noticed, because nothing here built it: the extract stage ran `-Djarmode=layertools`,
