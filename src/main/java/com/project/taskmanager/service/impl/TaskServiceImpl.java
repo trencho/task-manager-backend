@@ -1,5 +1,6 @@
 package com.project.taskmanager.service.impl;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -22,6 +23,7 @@ public class TaskServiceImpl implements TaskService {
     private static final String TASK_NOT_FOUND_FOR_USER = "Task not found for user: ";
 
     private final TaskRepository taskRepository;
+    private final Clock clock;
 
     @Override
     public Page<Task> getAllTasks(final String username, final TaskStatus status, final Priority priority,
@@ -74,7 +76,7 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public List<Task> getDueReminders(final String username, final int withinDays) {
-        return taskRepository.findDueReminders(username, LocalDate.now().plusDays(withinDays));
+        return taskRepository.findDueReminders(username, LocalDate.now(clock).plusDays(withinDays));
     }
 
     @Override

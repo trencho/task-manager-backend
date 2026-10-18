@@ -1,6 +1,9 @@
 package com.project.taskmanager;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -192,12 +195,15 @@ class TaskServiceImplUnitTest {
     @Test
     void getDueReminders_asksForTodayPlusTheLeadTime() {
         // The bound is what makes overdue tasks appear: they are already before today, so they fall
-        // inside the window rather than dropping out of it.
+        // inside the window rather than dropping out of it. The clock is pinned a millisecond before
+        // midnight, where a test reading the real clock separately from the service could disagree with it.
+        final var clock = Clock.fixed(Instant.parse("2026-03-10T23:59:59.999Z"), ZoneOffset.UTC);
+        final var service = new TaskServiceImpl(taskRepository, clock);
         final var captor = ArgumentCaptor.forClass(LocalDate.class);
         when(taskRepository.findDueReminders(eq(USERNAME), captor.capture())).thenReturn(List.of());
 
-        taskService.getDueReminders(USERNAME, 3);
+        service.getDueReminders(USERNAME, 3);
 
-        assertEquals(LocalDate.now().plusDays(3), captor.getValue());
+        assertEquals(LocalDate.of(2026, 3, 13), captor.getValue());
     }
 }
