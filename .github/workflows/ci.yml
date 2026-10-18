@@ -24,14 +24,67 @@ jobs:
   build:
     name: build + test (JDK 25)
     runs-on: ubuntu-latest
+    # Job-level, so it replaces the workflow-level block: `contents: read` is carried over, and the
+    # two read scopes are for the `tested` step's run lookup. Kept here rather than at the top so
+    # `auto-merge`, which sets its own block, is unaffected.
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
 
     steps:
       - uses: actions/checkout@v7
+
+      # A merged pull request was already built and tested by this workflow on its head. When that
+      # head has the identical tree, the master run would only repeat the result, so this step skips
+      # the JDK setup, the build and tests, and the image build. It skips them only when all three
+      # hold: this commit is a PR's merge commit, the PR head has the same tree, and a ci.yml run on
+      # that head in the pull_request event succeeded. Everything else runs them: a direct push, a
+      # PR merged while behind master (a different tree), a failed, missing or cancelled PR run, and
+      # any API error. The owner accepted the cost on 2026-10-18: master no longer tries a second
+      # shuffle seed per merge, the check that caught the order bug fixed in #65.
+      - name: Check whether ci.yml already tested this tree
+        id: tested
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          tested=false
+          reason="no merged pull request has this commit as its merge commit"
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" \
+            --jq "[.[] | select(.merge_commit_sha == \"$SHA\")][0] // empty | \"\(.number) \(.head.sha)\"") ||
+            { pr=""; reason="the pull request lookup failed"; }
+          if [ -n "$pr" ]; then
+            num=${pr%% *}
+            head=${pr##* }
+            merged_tree=$(gh api "repos/$REPO/git/commits/$SHA" --jq .tree.sha) || merged_tree=""
+            head_tree=$(gh api "repos/$REPO/git/commits/$head" --jq .tree.sha) || head_tree=""
+            if [ -z "$merged_tree" ] || [ "$merged_tree" != "$head_tree" ]; then
+              reason="#$num's head tree differs from the merged tree"
+            else
+              runs=$(gh api "repos/$REPO/actions/runs?head_sha=$head&event=pull_request&per_page=100" \
+                --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .conclusion == "success")] | length') ||
+                runs=""
+              if [ -n "$runs" ] && [ "$runs" -gt 0 ]; then
+                tested=true
+                reason="#$num's head ${head:0:7} has the same tree and its ci.yml run succeeded"
+              else
+                reason="#$num's head ${head:0:7} has no successful ci.yml pull_request run (${runs:-lookup failed})"
+              fi
+            fi
+          fi
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
+          if [ "$tested" = true ]; then verdict="Build and tests skipped"; else verdict="Build and tests run"; fi
+          echo "$verdict: $reason"
+          echo "$verdict: $reason" >> "$GITHUB_STEP_SUMMARY"
 
       # Java 25 (current LTS). javac 23+ no longer runs annotation processors found only on the
       # classpath, so the pom declares Lombok and MapStruct explicitly via annotationProcessorPaths
       # (maven-compiler-plugin) — that, not a version pin, is what keeps the generated code building.
       - name: Set up JDK 25
+        if: steps.tested.outputs.tested != 'true'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -39,6 +92,7 @@ jobs:
           cache: maven
 
       - name: Build and test
+        if: steps.tested.outputs.tested != 'true'
         # ubuntu-latest runners ship a running Docker daemon, which the Testcontainers
         # -backed TaskControllerIntegrationTest needs. Testcontainers is NOT pinned in the
         # pom -- the Spring Boot BOM manages it, currently 2.0.5. Read the resolved version
@@ -75,7 +129,9 @@ jobs:
       # build (deps -> package -> extract -> final): without it only `final` is exported, and `deps`
       # -- the slow one, and the whole reason to cache -- is not.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.tested.outputs.tested != 'true'
       - name: Build the container image
+        if: steps.tested.outputs.tested != 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
