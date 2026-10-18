@@ -15,6 +15,7 @@ import com.project.taskmanager.security.RefreshTokenCookie;
 import com.project.taskmanager.service.RefreshTokenService;
 import com.project.taskmanager.service.TokenPair;
 import com.project.taskmanager.service.UserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,6 +28,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,6 +63,14 @@ class AuthControllerUnitTest {
 
     @InjectMocks
     private AuthController authController;
+
+    // AuthController.login writes the authentication into SecurityContextHolder, and these tests call
+    // it directly on the test thread. Left there, a later class's anonymous MockMvc probe starts
+    // signed in and gets 403 instead of 401 (CI seed 39082329973).
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void shouldRegisterUserSuccessfully() {
