@@ -1,5 +1,13 @@
 package com.project.taskmanager.config;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClients;
@@ -13,19 +21,54 @@ import org.testcontainers.containers.MongoDBContainer;
 public class MongoTestContainerConfig {
 
     /**
-     * Pinned to the same image the production compose stack runs (docker/mongo/Dockerfile is
-     * {@code mongo:8.0.29}). {@code mongo:latest} used to be used here, which contradicted the
-     * repository's own stated policy -- .github/dependabot.yml holds the mongo image to the 8.0
-     * line because "8.1+ are rapid releases" -- and meant the integration tests could silently
-     * start exercising a different major than the one that ships.
-     * <p>
-     * This pin is NOT maintained by Dependabot: it updates docker/mongo/Dockerfile and cannot see
-     * an image tag living in Java source. It drifted within a day of the 8.0.28 -> 8.0.29 bump
-     * auto-merging (#13). When that Dockerfile moves, move this line in the same commit.
+     * Resolved against Maven's {@code basedir}, which Surefire sets, so a run from an IDE with
+     * another working directory finds the same file.
      */
+    static final Path MONGO_DOCKERFILE = Path.of(System.getProperty("basedir", "."), "docker", "mongo", "Dockerfile");
+
+    private static final Pattern FROM_LINE = Pattern.compile("(?i)^FROM\\s+(.*)$");
+
+    /**
+     * The image the production compose stack runs: the last {@code FROM} line of
+     * docker/mongo/Dockerfile, which is the stage that ships, digest included. Dependabot bumps only
+     * that file and cannot see a tag in Java source, so a literal here drifted within a day of the
+     * 8.0.28 -> 8.0.29 bump auto-merging (#13), and again from 8.0.29 to 8.0.32. Reading the
+     * Dockerfile makes every Dependabot bump the version the integration tests run.
+     * <p>
+     * {@code --platform} style flags are skipped. A {@code ${...}} build argument cannot be resolved
+     * here, so it fails with a message naming this method. When the line carries a digest the tag is
+     * dropped ({@code mongo@sha256:...}): the digest names the exact image, and Testcontainers reads
+     * {@code mongo:8.0.32@sha256:...} as a repository called {@code mongo:8.0.32} and refuses it.
+     */
+    static String productionMongoImage(final List<String> dockerfileLines) {
+        String image = null;
+        for (final var line : dockerfileLines) {
+            final Matcher from = FROM_LINE.matcher(line.strip());
+            if (from.matches()) {
+                image = Arrays.stream(from.group(1).split("\\s+")).filter(token -> !token.startsWith("--")).findFirst()
+                        .orElse(null);
+            }
+        }
+        if (image == null) {
+            throw new IllegalStateException(MONGO_DOCKERFILE + " has no FROM line naming an image");
+        }
+        if (image.contains("${") || image.startsWith("$")) {
+            throw new IllegalStateException("productionMongoImage cannot resolve the build argument in '" + image
+                    + "' from " + MONGO_DOCKERFILE);
+        }
+        final int at = image.indexOf('@');
+        if (at < 0) {
+            return image;
+        }
+        final var name = image.substring(0, at);
+        final int tag = name.lastIndexOf(':');
+        final var repository = tag > name.lastIndexOf('/') ? name.substring(0, tag) : name;
+        return repository + image.substring(at);
+    }
+
     @Bean
-    public MongoDBContainer mongoDBContainer() {
-        final var mongoDBContainer = new MongoDBContainer("mongo:8.0.29");
+    public MongoDBContainer mongoDBContainer() throws IOException {
+        final var mongoDBContainer = new MongoDBContainer(productionMongoImage(Files.readAllLines(MONGO_DOCKERFILE)));
         mongoDBContainer.start();
         return mongoDBContainer;
     }
