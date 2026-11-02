@@ -28,6 +28,15 @@ class MongoTestContainerConfigTest {
     }
 
     @Test
+    void theTestContainerAndTheProductionImageHandRseqToGlibcAlike() throws IOException {
+        final var dockerfile = Files.readString(MongoTestContainerConfig.MONGO_DOCKERFILE);
+
+        assertThat(MongoTestContainerConfig.GLIBC_TUNABLES).isEqualTo("glibc.pthread.rseq=1");
+        assertThat(dockerfile).containsPattern(
+                "(?m)^ENV\s+GLIBC_TUNABLES=" + Pattern.quote(MongoTestContainerConfig.GLIBC_TUNABLES) + "\s*$");
+    }
+
+    @Test
     void takesTheLastStageAndPinsItsDigest() {
         final var lines = List.of("# syntax=docker/dockerfile:1", "FROM alpine:3.22 AS fetch", "RUN echo hi",
                 "from\tmongo:8.0.32@sha256:abc123 AS db", "COPY init.js /docker-entrypoint-initdb.d/");

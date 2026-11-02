@@ -26,6 +26,13 @@ public class MongoTestContainerConfig {
      */
     static final Path MONGO_DOCKERFILE = Path.of(System.getProperty("basedir", "."), "docker", "mongo", "Dockerfile");
 
+    /**
+     * Lets mongod 8.0.x start on Linux kernels 6.19 to 7.0.13 (SERVER-121912), which GitHub's runners
+     * boot. The test container runs the upstream image, not docker/mongo/Dockerfile, so it does not
+     * inherit that file's {@code ENV}; a test keeps the two values equal.
+     */
+    static final String GLIBC_TUNABLES = "glibc.pthread.rseq=1";
+
     private static final Pattern FROM_LINE = Pattern.compile("(?i)^FROM\\s+(.*)$");
 
     /**
@@ -68,7 +75,8 @@ public class MongoTestContainerConfig {
 
     @Bean
     public MongoDBContainer mongoDBContainer() throws IOException {
-        final var mongoDBContainer = new MongoDBContainer(productionMongoImage(Files.readAllLines(MONGO_DOCKERFILE)));
+        final var mongoDBContainer = new MongoDBContainer(productionMongoImage(Files.readAllLines(MONGO_DOCKERFILE)))
+                .withEnv("GLIBC_TUNABLES", GLIBC_TUNABLES);
         mongoDBContainer.start();
         return mongoDBContainer;
     }
